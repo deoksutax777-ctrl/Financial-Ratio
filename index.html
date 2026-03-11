@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주요재무사항 분석기</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: '맑은 고딕', 'Malgun Gothic', sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+.container { max-width: 1250px; margin: 0 auto; padding: 24px; }
+
+header { text-align: center; margin-bottom: 28px; }
+header h1 { font-size: 24px; color: #1a365d; margin-bottom: 6px; }
+header p { font-size: 13px; color: #718096; }
+
+.card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 20px; }
+.card h2 { font-size: 16px; color: #2d3748; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.card h2 .icon { font-size: 20px; }
+
+/* 당기 연도 선택 */
+.year-selector { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 12px 16px; background: #ebf4ff; border-radius: 8px; }
+.year-selector label { font-weight: bold; font-size: 14px; color: #2b6cb0; }
+.year-selector select { padding: 6px 12px; border: 1px solid #bee3f8; border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff; }
+.year-selector .hint { font-size: 12px; color: #718096; margin-left: auto; }
+
+/* Drop zone */
+.drop-zone { border: 2px dashed #cbd5e0; border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+.drop-zone:hover, .drop-zone.drag-over { border-color: #4299e1; background: #ebf8ff; }
+.drop-zone .icon-upload { font-size: 48px; color: #a0aec0; margin-bottom: 12px; }
+.drop-zone p { color: #718096; font-size: 14px; line-height: 1.6; }
+.drop-zone p strong { color: #4a5568; }
+.drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.file-list { margin-top: 12px; }
+.file-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f7fafc; border-radius: 6px; margin-bottom: 4px; font-size: 13px; }
+.file-item .name { flex: 1; color: #2d3748; }
+.file-item .status { color: #38a169; font-size: 12px; }
+.file-item .remove { background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 16px; padding: 0 4px; }
+
+/* Detection log */
+.detect-log { margin-top: 12px; padding: 12px; background: #f0fff4; border-radius: 6px; font-size: 12px; color: #276749; max-height: 120px; overflow-y: auto; display: none; }
+.detect-log.show { display: block; }
+.detect-log .log-item { padding: 2px 0; }
+.detect-log .log-item.warn { color: #c05621; }
+
+/* Input section */
+.input-grid { overflow-x: auto; }
+.input-grid table { width: 100%; border-collapse: collapse; min-width: 600px; }
+.input-grid th { background: #2b6cb0; color: #fff; padding: 10px 12px; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; }
+.input-grid th:first-child { text-align: left; border-radius: 6px 0 0 0; }
+.input-grid th:last-child { border-radius: 0 6px 0 0; }
+.input-grid th.year-hidden { background: #a0aec0; font-size: 11px; }
+.input-grid td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+.input-grid td:first-child { font-weight: 500; white-space: nowrap; padding-left: 16px; color: #4a5568; }
+.input-grid tr.section-row td { background: #edf2f7; font-weight: 700; color: #2d3748; padding: 8px 12px; font-size: 13px; }
+.input-grid tr:hover td { background: #f7fafc; }
+.input-grid tr.section-row:hover td { background: #edf2f7; }
+.input-grid input[type="text"] {
+  width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px;
+  font-size: 13px; font-family: 'Consolas', 'D2Coding', monospace; text-align: right;
+  transition: border-color 0.2s; background: #fffff0;
+}
+.input-grid input[type="text"]:focus { outline: none; border-color: #4299e1; background: #fff; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+.input-grid input[type="text"].auto-filled { background: #f0fff4; border-color: #9ae6b4; }
+
+.input-actions { display: flex; gap: 8px; margin-top: 12px; }
+.btn { padding: 8px 20px; border: none; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.15s; }
+.btn-primary { background: #3182ce; color: #fff; }
+.btn-primary:hover { background: #2b6cb0; }
+.btn-secondary { background: #edf2f7; color: #4a5568; }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-danger { background: #fed7d7; color: #c53030; }
+.btn-danger:hover { background: #feb2b2; }
+
+/* Result section */
+.result-wrapper { overflow-x: auto; }
+.result-table { width: 100%; border-collapse: collapse; min-width: 900px; }
+.result-table th { padding: 10px 14px; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; }
+.result-table td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
+.result-table .label-col { font-weight: 500; text-align: left; white-space: nowrap; }
+.result-table .value-col { text-align: right; font-family: 'Consolas', 'D2Coding', monospace; }
+.result-table .spacer-col { width: 30px; border: none !important; background: transparent !important; }
+
+/* Left table header */
+.result-table th.left-header { background: #2b6cb0; color: #fff; }
+.result-table th.left-header:first-child { border-radius: 6px 0 0 0; }
+/* Right table header */
+.result-table th.right-header { background: #2f855a; color: #fff; }
+.result-table th.right-header:last-child { border-radius: 0 6px 0 0; }
+
+.result-table tbody tr:nth-child(odd) td:not(.spacer-col) { background: #fafafa; }
+.result-table tbody tr:hover td:not(.spacer-col) { background: #ebf8ff; }
+.result-table tbody tr:last-child td { border-bottom: 2px solid #2d3748; }
+
+.unit-label { text-align: right; font-size: 12px; color: #a0aec0; margin-bottom: 6px; }
+
+/* Formula reference */
+.formula-ref { margin-top: 20px; padding: 16px; background: #f7fafc; border-radius: 8px; }
+.formula-ref h3 { font-size: 14px; color: #2d3748; margin-bottom: 10px; }
+.formula-ref ul { list-style: none; padding: 0; }
+.formula-ref li { font-size: 12px; color: #718096; padding: 3px 0; padding-left: 14px; position: relative; }
+.formula-ref li::before { content: '·'; position: absolute; left: 4px; color: #a0aec0; }
+
+/* Borrow part delete button */
+.borrow-del { background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 15px; padding: 0 3px; opacity: 0.5; transition: opacity 0.15s; vertical-align: middle; }
+.borrow-del:hover { opacity: 1; }
+
+/* Print actions */
+.print-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* Print styles */
+@media print {
+  body { background: #fff; }
+  .container { padding: 0; max-width: 100%; }
+  .card { box-shadow: none; border: none; padding: 12px 0; }
+  .upload-card, .input-card, .print-actions, header p, .year-selector .hint { display: none !important; }
+  .year-selector { background: none; padding: 0; margin-bottom: 8px; }
+  .result-table { font-size: 11px; min-width: 0; }
+  .result-table th, .result-table td { padding: 6px 10px; }
+  .formula-ref { page-break-inside: avoid; }
+  .btn { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>주요재무사항 분석기</h1>
+    <p>재무상태표·손익계산서 Excel 파일을 드래그&드롭하면 경영비율을 자동 계산합니다</p>
+  </header>
+
+  <!-- 당기 연도 선택 -->
+  <div class="card" style="padding: 12px 24px;">
+    <div class="year-selector">
+      <label>당기 연도:</label>
+      <select id="currentYear">
+        <option value="2023">2023년</option>
+        <option value="2024">2024년</option>
+        <option value="2025" selected>2025년</option>
+        <option value="2026">2026년</option>
+        <option value="2027">2027년</option>
+      </select>
+      <span class="hint">표시: 당기 포함 최근 3개년 / 입력: 증가율 계산을 위해 4개년</span>
+    </div>
+  </div>
+
+  <!-- 파일 업로드 -->
+  <div class="card upload-card">
+    <h2><span class="icon">📂</span> 파일 업로드</h2>
+    <div class="drop-zone" id="dropZone">
+      <div class="icon-upload">📄</div>
+      <p><strong>Excel 파일을 여기에 드래그하세요</strong><br>
+      재무상태표, 손익계산서 (.xlsx, .xls) 파일 지원<br>
+      <span style="font-size:12px; color:#a0aec0;">또는 클릭하여 파일 선택</span></p>
+      <input type="file" id="fileInput" multiple accept=".xlsx,.xls,.csv">
+    </div>
+    <div class="file-list" id="fileList"></div>
+    <div class="detect-log" id="detectLog"></div>
+  </div>
+
+  <!-- 데이터 입력 -->
+  <div class="card input-card">
+    <h2><span class="icon">✏️</span> 재무데이터 입력 <span style="font-size:12px; font-weight:normal; color:#a0aec0; margin-left:8px;">(단위: 백만원)</span></h2>
+    <div class="input-grid">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:200px;">항목</th>
+            <th class="year-hidden" id="thY0"></th>
+            <th id="thY1"></th>
+            <th id="thY2"></th>
+            <th id="thY3"></th>
+          </tr>
+        </thead>
+        <tbody id="inputBody"></tbody>
+      </table>
+    </div>
+    <div class="input-actions">
+      <button class="btn btn-primary" onclick="calculate(); document.getElementById('resultCard').scrollIntoView({behavior:'smooth'})">🔄 재계산</button>
+      <button class="btn btn-danger" onclick="resetAll()">초기화</button>
+      <button class="btn btn-secondary" onclick="loadSample()">예시 데이터 입력</button>
+    </div>
+  </div>
+
+  <!-- 결과 표시 -->
+  <div class="card" id="resultCard">
+    <h2><span class="icon">📊</span> 주요재무사항</h2>
+    <div class="unit-label" id="unitLabel"></div>
+    <div class="result-wrapper">
+      <table class="result-table" id="resultTable">
+        <thead><tr id="resultHead"></tr></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+    <div class="formula-ref">
+      <h3>■ 산출기준</h3>
+      <ul>
+        <li>순이익증가율 = (당기순이익 − 전기순이익) ÷ |전기순이익| × 100</li>
+        <li>자기자본비율 = 자기자본 ÷ 총자산 × 100</li>
+        <li>부채비율 = 부채총계 ÷ 자기자본 × 100</li>
+        <li>차입금의존도 = 차입금 ÷ 총자산 × 100</li>
+        <li>유동부채비율 = 유동부채 ÷ 자기자본 × 100</li>
+        <li>유동비율 = 유동자산 ÷ 유동부채 × 100</li>
+        <li>금융비용부담률 = 금융비용 ÷ 매출액 × 100</li>
+        <li>이자보상배율 = 영업이익 ÷ 금융비용(이자비용)</li>
+        <li>매출액증가율 = (당기매출액 − 전기매출액) ÷ |전기매출액| × 100</li>
+        <li>매출액영업이익률 = 영업이익 ÷ 매출액 × 100</li>
+        <li>매출액순이익률 = 당기순이익 ÷ 매출액 × 100</li>
+        <li>총자산순이익률(ROA) = 당기순이익 ÷ 총자산 × 100</li>
+        <li>자산회전율 = 매출액 ÷ 총자산</li>
+      </ul>
+    </div>
+    <div class="print-actions">
+      <button class="btn btn-primary" onclick="downloadExcel()" style="background:#2f855a;">📥 엑셀 다운로드</button>
+      <button class="btn btn-secondary" onclick="window.print()">🖨️ 인쇄</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 설정 ──
+const FIELDS = [
+  { section: '재무상태표' },
+  { id: 'totalAssets',   label: '자산총계',           keywords: ['자산총계','자산 총계','자산합계','Total assets','총자산'] },
+  { id: 'currentAssets', label: '유동자산',           keywords: ['유동자산','Current assets'] },
+  { id: 'totalEquity',   label: '자본총계(자기자본)',  keywords: ['자본총계','자본 총계','자본합계','자기자본합계','Total equity','Total stockholders'] },
+  { id: 'currentLiab',   label: '유동부채',           keywords: ['유동부채','Current liabilities'] },
+  { id: 'capitalStock',  label: '자본금',             keywords: ['자본금','Capital stock','Common stock'] },
+  { id: 'borrowings',    label: '차입금(단기+장기)',   keywords: ['차입금합계'], composite: true },
+  { section: '손익계산서' },
+  { id: 'revenue',       label: '매출액',             keywords: ['매출액','매출','Revenue','Net revenue','수익'] },
+  { id: 'opIncome',      label: '영업이익',           keywords: ['영업이익','영업손익','Operating income','Operating profit'] },
+  { id: 'finCost',       label: '금융비용(이자비용)',  keywords: ['이자비용','금융비용','금융원가','Interest expense','Finance cost'] },
+  { id: 'netIncome',     label: '당기순이익',         keywords: ['당기순이익','당기순손익','Net income','Net profit'] },
+];
+
+// 차입금 구성요소
+const BORROW_PARTS = [
+  { id: 'stBorrow',  label: '단기차입금',       keywords: ['단기차입금','Short-term borrowings'] },
+  { id: 'ltBorrow',  label: '장기차입금',       keywords: ['장기차입금','Long-term borrowings'] },
+  { id: 'bonds',     label: '사채',            keywords: ['사채','Bonds payable','Debentures'] },
+  { id: 'curLtDebt', label: '유동성장기부채',   keywords: ['유동성장기부채','유동성장기차입금','Current portion of long-term'] },
+  { id: 'tempRecv',  label: '가수금',          keywords: ['가수금'] },
+  { id: 'execBorrow',label: '주임종단기차입금', keywords: ['주임종단기차입금','임원단기차입금'] },
+];
+
+const dataFields = FIELDS.filter(f => f.id);
+let activeBorrowParts = [...BORROW_PARTS]; // 기본값 + 파싱에서 발견된 동적 항목
+let removedBorrowIds = new Set();           // X버튼으로 삭제한 항목 ID
+function getVisibleBorrowParts() { return activeBorrowParts.filter(p => !removedBorrowIds.has(p.id)); }
+function getAllInputFields() { return [...dataFields.filter(f => !f.composite), ...getVisibleBorrowParts()]; }
+
+// ── 상태 ──
+let currentYear = 2025;
+let inputData = {};  // { fieldId: { year: value } }
+
+function getYears() {
+  const y = currentYear;
+  return [y - 3, y - 2, y - 1, y];
+}
+function getDisplayYears() {
+  const y = currentYear;
+  return [y - 2, y - 1, y];
+}
+
+// ── 초기화 ──
+function init() {
+  currentYear = parseInt(document.getElementById('currentYear').value);
+  loadFromStorage();
+  buildInputGrid();
+  updateYearHeaders();
+  calculate();
+  setupDragDrop();
+}
+
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem('fin_ratio_data');
+    if (saved) inputData = JSON.parse(saved);
+    const savedYear = localStorage.getItem('fin_ratio_year');
+    if (savedYear) {
+      currentYear = parseInt(savedYear);
+      document.getElementById('currentYear').value = currentYear;
+    }
+    const savedParts = localStorage.getItem('fin_ratio_borrow_parts');
+    if (savedParts) activeBorrowParts = JSON.parse(savedParts);
+    const savedRemoved = localStorage.getItem('fin_ratio_removed_borrows');
+    if (savedRemoved) removedBorrowIds = new Set(JSON.parse(savedRemoved));
+  } catch(e) {}
+}
+
+function saveToStorage() {
+  try {
+    localStorage.setItem('fin_ratio_data', JSON.stringify(inputData));
+    localStorage.setItem('fin_ratio_year', currentYear);
+    localStorage.setItem('fin_ratio_borrow_parts', JSON.stringify(activeBorrowParts));
+    localStorage.setItem('fin_ratio_removed_borrows', JSON.stringify([...removedBorrowIds]));
+  } catch(e) {}
+}
+
+// ── 입력 그리드 생성 ──
+function buildInputGrid() {
+  const tbody = document.getElementById('inputBody');
+  tbody.innerHTML = '';
+  const years = getYears();
+
+  for (const field of FIELDS) {
+    if (field.section) {
+      const tr = document.createElement('tr');
+      tr.className = 'section-row';
+      tr.innerHTML = `<td colspan="5">■ ${field.section}</td>`;
+      tbody.appendChild(tr);
+      continue;
+    }
+    if (field.composite) {
+      // 차입금 = 합산 행
+      const tr = document.createElement('tr');
+      let html = `<td style="font-weight:700; color:#2b6cb0;">${field.label}</td>`;
+      for (const yr of years) {
+        html += `<td><input type="text" id="inp_${field.id}_${yr}" data-field="${field.id}" data-year="${yr}" placeholder="자동합산" style="background:#e6f6ff; font-weight:600;" readonly></td>`;
+      }
+      tr.innerHTML = html;
+      tbody.appendChild(tr);
+
+      // 하위 항목 (동적 목록, X 삭제 버튼 포함)
+      for (const part of getVisibleBorrowParts()) {
+        const tr2 = document.createElement('tr');
+        const eid = part.id.replace(/'/g, "\\'");
+        let h = `<td style="padding-left:28px; font-size:12px; color:#718096;">└ ${part.label} <button class="borrow-del" onclick="removeBorrowPart('${eid}')" title="제거">×</button></td>`;
+        for (const yr of years) {
+          const val = inputData[part.id]?.[yr] ?? '';
+          h += `<td><input type="text" id="inp_${part.id}_${yr}" data-field="${part.id}" data-year="${yr}" value="${val ? formatNum(val) : ''}" style="font-size:12px;"></td>`;
+        }
+        tr2.innerHTML = h;
+        tbody.appendChild(tr2);
+      }
+      continue;
+    }
+
+    const tr = document.createElement('tr');
+    let html = `<td>${field.label}</td>`;
+    for (const yr of years) {
+      const val = inputData[field.id]?.[yr] ?? '';
+      html += `<td><input type="text" id="inp_${field.id}_${yr}" data-field="${field.id}" data-year="${yr}" value="${val ? formatNum(val) : ''}"></td>`;
+    }
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  }
+
+  // 이벤트 바인딩
+  tbody.querySelectorAll('input[type="text"]').forEach(inp => {
+    if (inp.readOnly) return;
+    inp.addEventListener('input', onInputChange);
+    inp.addEventListener('focus', function() { this.select(); });
+    inp.addEventListener('blur', function() {
+      const v = parseNum(this.value);
+      if (!isNaN(v) && v !== 0) this.value = formatNum(v);
+    });
+  });
+
+  updateBorrowingSums();
+}
+
+function onInputChange(e) {
+  const field = e.target.dataset.field;
+  const year = parseInt(e.target.dataset.year);
+  const rawVal = e.target.value.trim();
+  if (!inputData[field]) inputData[field] = {};
+  if (rawVal === '' || rawVal === '-') {
+    delete inputData[field][year];
+  } else {
+    const val = parseNum(rawVal);
+    if (val === 0 && !/0/.test(rawVal)) {
+      delete inputData[field][year]; // 의미 없는 입력은 삭제
+    } else {
+      inputData[field][year] = val;
+    }
+  }
+  if (activeBorrowParts.some(p => p.id === field)) updateBorrowingSums();
+  saveToStorage();
+  calculate();
+}
+
+function updateBorrowingSums() {
+  const years = getYears();
+  const visible = getVisibleBorrowParts();
+  for (const yr of years) {
+    let sum = 0;
+    let hasAny = false;
+    for (const part of visible) {
+      const v = inputData[part.id]?.[yr];
+      if (v !== undefined) { sum += v; hasAny = true; }
+    }
+    if (!inputData.borrowings) inputData.borrowings = {};
+    if (hasAny) {
+      inputData.borrowings[yr] = sum;
+    } else {
+      delete inputData.borrowings[yr];
+    }
+    const el = document.getElementById(`inp_borrowings_${yr}`);
+    if (el) el.value = hasAny ? formatNum(sum) : '';
+  }
+}
+
+function removeBorrowPart(id) {
+  removedBorrowIds.add(id);
+  delete inputData[id];
+  saveToStorage();
+  buildInputGrid();
+  calculate();
+}
+
+function updateYearHeaders() {
+  const years = getYears();
+  document.getElementById('thY0').textContent = `${years[0]}/12 (증가율용)`;
+  document.getElementById('thY1').textContent = `${years[1]}/12`;
+  document.getElementById('thY2').textContent = `${years[2]}/12`;
+  document.getElementById('thY3').textContent = `${years[3]}/12`;
+}
+
+// ── 계산 ──
+function hasVal(fieldId, year) {
+  return inputData[fieldId] !== undefined && inputData[fieldId][year] !== undefined;
+}
+
+function getVal(fieldId, year) {
+  return inputData[fieldId]?.[year] ?? null;
+}
+
+function calcRatio(numerator, denominator) {
+  if (numerator === null || denominator === null || denominator === 0) return null;
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function calcGrowth(current, previous) {
+  if (current === null || previous === null || previous === 0) return null;
+  return Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10;
+}
+
+function calcTimes(numerator, denominator) {
+  if (numerator === null || denominator === null || denominator === 0) return null;
+  return Math.round((numerator / denominator) * 10) / 10;
+}
+
+function calculate() {
+  const displayYears = getDisplayYears();
+  const years = getYears();
+
+  // 결과 테이블 헤더
+  const head = document.getElementById('resultHead');
+  head.innerHTML = `
+    <th class="left-header" style="border-radius:6px 0 0 0;">재무항목</th>
+    ${displayYears.map(y => `<th class="left-header">${y}/12</th>`).join('')}
+    <th class="spacer-col"></th>
+    <th class="right-header">재무비율</th>
+    ${displayYears.map((y,i) => `<th class="right-header" ${i===displayYears.length-1?'style="border-radius:0 6px 0 0;"':''}>${y}/12</th>`).join('')}
+  `;
+
+  document.getElementById('unitLabel').textContent = `(단위: 백만원, %, 배, 회)`;
+
+  // 좌측 재무항목 (10개)
+  const leftRows = [
+    { label: '총자산',     field: 'totalAssets' },
+    { label: '유동자산',   field: 'currentAssets' },
+    { label: '자기자본',   field: 'totalEquity' },
+    { label: '유동부채',   field: 'currentLiab' },
+    { label: '자본금',     field: 'capitalStock' },
+    { label: '차입금',     field: 'borrowings' },
+    { label: '금융비용',   field: 'finCost' },
+    { label: '매출액',     field: 'revenue' },
+    { label: '영업이익',   field: 'opIncome' },
+    { label: '당기순이익', field: 'netIncome' },
+  ];
+
+  // 우측 재무비율 (13개)
+  const rightRows = displayYears.map((yr, i) => {
+    const prevYr = i === 0 ? years[0] : displayYears[i - 1];
+    const ta = getVal('totalAssets', yr), te = getVal('totalEquity', yr);
+    const debtRatioNum = (ta !== null && te !== null) ? ta - te : null;
+    return {
+      순이익증가율:     calcGrowth(getVal('netIncome', yr), getVal('netIncome', prevYr)),
+      자기자본비율:     calcRatio(te, ta),
+      부채비율:         calcRatio(debtRatioNum, te),
+      차입금의존도:     calcRatio(getVal('borrowings', yr), ta),
+      유동부채비율:     calcRatio(getVal('currentLiab', yr), te),
+      유동비율:         calcRatio(getVal('currentAssets', yr), getVal('currentLiab', yr)),
+      금융비용부담률:   calcRatio(getVal('finCost', yr), getVal('revenue', yr)),
+      이자보상배율:     calcTimes(getVal('opIncome', yr), getVal('finCost', yr)),
+      매출액증가율:     calcGrowth(getVal('revenue', yr), getVal('revenue', prevYr)),
+      매출액영업이익률: calcRatio(getVal('opIncome', yr), getVal('revenue', yr)),
+      매출액순이익률:   calcRatio(getVal('netIncome', yr), getVal('revenue', yr)),
+      총자산순이익률:   calcRatio(getVal('netIncome', yr), ta),
+      자산회전율:       calcTimes(getVal('revenue', yr), ta),
+    };
+  });
+
+  const rightDefs = [
+    { key: '순이익증가율',     label: '순이익증가율(%)',          unit: '%' },
+    { key: '자기자본비율',     label: '자기자본비율(%)',          unit: '%' },
+    { key: '부채비율',         label: '부채비율(%)',              unit: '%' },
+    { key: '차입금의존도',     label: '차입금의존도(%)',          unit: '%' },
+    { key: '유동부채비율',     label: '유동부채비율(%)',          unit: '%' },
+    { key: '유동비율',         label: '유동비율(%)',              unit: '%' },
+    { key: '금융비용부담률',   label: '금융비용부담률(%)',        unit: '%' },
+    { key: '이자보상배율',     label: '이자보상배율(배)',         unit: '배' },
+    { key: '매출액증가율',     label: '매출액증가율(%)',          unit: '%' },
+    { key: '매출액영업이익률', label: '매출액영업이익률(%)',      unit: '%' },
+    { key: '매출액순이익률',   label: '매출액순이익률(%)',        unit: '%' },
+    { key: '총자산순이익률',   label: '총자산순이익률(ROA)(%)',   unit: '%' },
+    { key: '자산회전율',       label: '자산회전율(회)',           unit: '회' },
+  ];
+
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+  const maxRows = Math.max(leftRows.length, rightDefs.length);
+
+  for (let i = 0; i < maxRows; i++) {
+    const tr = document.createElement('tr');
+    // 좌측
+    if (i < leftRows.length) {
+      const lRow = leftRows[i];
+      let html = `<td class="label-col">${lRow.label}</td>`;
+      for (const yr of displayYears) {
+        const v = getVal(lRow.field, yr);
+        html += `<td class="value-col">${v !== null ? formatNum(v) : '-'}</td>`;
+      }
+      html += `<td class="spacer-col"></td>`;
+      tr.innerHTML = html;
+    } else {
+      let html = `<td class="label-col"></td>`;
+      for (const yr of displayYears) html += `<td class="value-col"></td>`;
+      html += `<td class="spacer-col"></td>`;
+      tr.innerHTML = html;
+    }
+    // 우측
+    if (i < rightDefs.length) {
+      const rd = rightDefs[i];
+      let rHtml = `<td class="label-col">${rd.label}</td>`;
+      for (let j = 0; j < displayYears.length; j++) {
+        const v = rightRows[j][rd.key];
+        const txt = v !== null ? v.toFixed(1) + rd.unit : '-';
+        rHtml += `<td class="value-col">${txt}</td>`;
+      }
+      tr.innerHTML += rHtml;
+    } else {
+      let rHtml = `<td class="label-col"></td>`;
+      for (const yr of displayYears) rHtml += `<td class="value-col"></td>`;
+      tr.innerHTML += rHtml;
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+// ── 드래그앤드롭 & 파일 파싱 ──
+function setupDragDrop() {
+  const dz = document.getElementById('dropZone');
+  const fi = document.getElementById('fileInput');
+
+  ['dragenter','dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); dz.classList.add('drag-over'); }));
+  ['dragleave','drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); dz.classList.remove('drag-over'); }));
+
+  dz.addEventListener('drop', ev => handleFiles(ev.dataTransfer.files));
+  fi.addEventListener('change', ev => { handleFiles(ev.target.files); ev.target.value = ''; });
+}
+
+function handleFiles(files) {
+  const fileList = document.getElementById('fileList');
+  const log = document.getElementById('detectLog');
+  log.innerHTML = '';
+  log.classList.add('show');
+
+  for (const file of files) {
+    addLog(`📄 파일 처리 중: ${file.name}`);
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<span class="name">📎 ${file.name}</span><span class="status">처리 중...</span><button class="remove" onclick="this.parentElement.remove()">×</button>`;
+    fileList.appendChild(item);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const count = extractFromWorkbook(wb, file.name);
+        item.querySelector('.status').textContent = `✓ ${count}건 인식`;
+        buildInputGrid();
+        calculate();
+        saveToStorage();
+      } catch(err) {
+        item.querySelector('.status').textContent = `✗ 오류`;
+        item.querySelector('.status').style.color = '#e53e3e';
+        addLog(`⚠️ 파싱 오류: ${err.message}`, true);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+// ═══════ 파싱 엔진 (법인세 결재조서 생성기 v2.5 기반) ═══════
+
+/**
+ * detectFmt: 엑셀 컬럼 구조 감지 — 세무사랑/위하고/기존 양식 자동 판별
+ *   sm_bs : 세무사랑 BS — 9열, 과목col0~4, 금액col6/8
+ *   sm_pl : 세무사랑 PL — 8열, 비율 포함, 과목col1, 금액col3/6
+ *   sm_mc : 세무사랑 MC — 7열, 과목col1~2, 금액col4/6
+ *   std5  : 위하고 표준 5열 (합계:C,E / 보조:B,D)
+ *   pl7   : 비율 포함 7열
+ *   bs5   : 기본 5열 fallback
+ */
+function detectFmt(rows) {
+  const maxCol = (rows || []).reduce((mx, r) => (r || []).length > mx ? (r || []).length : mx, 0);
+  let hasPct = false;
+  for (let i = 0; i < Math.min(rows.length, 12); i++)
+    for (let c = 0; c < (rows[i] || []).length; c++)
+      if (String(rows[i][c] || '').includes('비율')) hasPct = true;
+
+  let headerRow = -1;
+  for (let i = 0; i < Math.min(rows.length, 12); i++) {
+    const row = rows[i] || [];
+    for (let c = 0; c < Math.min(row.length, 3); c++) {
+      if (String(row[c] || '').replace(/\s/g, '').includes('과목')) { headerRow = i; break; }
+    }
+    if (headerRow >= 0) break;
+  }
+
+  if (headerRow >= 0) {
+    const dataStart = headerRow + 2;
+    for (let i = dataStart; i < Math.min(rows.length, dataStart + 10); i++) {
+      const row = rows[i] || [];
+      const c0 = String(row[0] || '').trim();
+      if (/^[Ⅰ-Ⅹ]{1,3}\.?$/.test(c0) || /^[①-⑩]$/.test(c0) || /^\d+$/.test(c0)) {
+        for (let c = 1; c <= Math.min(4, row.length - 1); c++) {
+          const v = String(row[c] || '').trim();
+          if (v && isNaN(+v.replace(/,/g, ''))) {
+            if (maxCol >= 9) return 'sm_bs';
+            if (hasPct) return 'sm_pl';
+            if (maxCol >= 7) return 'sm_mc';
+            return 'sm_mc';
+          }
+        }
+      }
+    }
+  }
+
+  if (hasPct) return 'pl7';
+  for (let i = 0; i < Math.min(rows.length, 12); i++) {
+    const row = rows[i] || [];
+    for (let c = 0; c < row.length; c++) {
+      const s = String(row[c] || '');
+      if (s.match(/\(전\)기/) || s.match(/\(전전\)기/) || s.match(/\(당\)기/)) return 'std5';
+    }
+  }
+  return 'bs5';
+}
+
+/** detectPeriods: 기간 라벨 감지 (당기/전기/전전기) */
+function detectPeriods(rows) {
+  let cur = null, prev = null;
+  for (let i = 0; i < Math.min(rows.length, 12); i++) {
+    for (const cell of (rows[i] || [])) {
+      const s = String(cell || '');
+      let m = s.match(/제\s*(\d+)\s*\(당\)\s*기/);
+      if (m) cur = '제' + m[1] + '기(당기)';
+      m = s.match(/제\s*(\d+)\s*\(전전\)\s*기/);
+      if (m) prev = '제' + m[1] + '기(전기)';
+      m = s.match(/제\s*(\d+)\s*\(전\)\s*기/);
+      if (m) {
+        if (!cur) cur = '제' + m[1] + '기(당기)';
+        else if (!prev) prev = '제' + m[1] + '기(전기)';
+      }
+    }
+  }
+  return { cur, prev };
+}
+
+/** findHeaderRows: "과목" 텍스트가 있는 행 번호 찾기 */
+function findHeaderRows(rows) {
+  const headers = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] || [];
+    for (let c = 0; c < Math.min(row.length, 3); c++) {
+      if (String(row[c] || '').replace(/\s/g, '').includes('과목')) { headers.push(i); break; }
+    }
+  }
+  return headers;
+}
+
+function isMetaRow(row) {
+  if (!row || row.length === 0) return true;
+  const hasAny = row.some(c => c != null && String(c).trim() !== '');
+  if (!hasAny) return true;
+  for (let c = 0; c < Math.min(row.length, 3); c++) {
+    const s = String(row[c] || '').replace(/\s/g, '');
+    if (s.includes('회사명') || s.includes('과목') || s.includes('금액') || s.match(/^제\d+기/)) return true;
+  }
+  return false;
+}
+
+function isPageTitle(row) {
+  for (let c = 0; c < (row || []).length; c++) {
+    const v = String(row[c] || '').replace(/\s/g, '');
+    if (v.includes('원가명세서') || v.includes('재무상태표') || v.includes('손익계산서')) return true;
+  }
+  return false;
+}
+
+function isRepeatedHeader(row) {
+  const s = String(row[0] || '').replace(/\s/g, '');
+  return s.includes('과목') || s.includes('금액');
+}
+
+function cleanName(raw) {
+  return raw.replace(/^[Ⅰ-Ⅹ]{1,3}\.\s*/, '').replace(/^[①-⑩]\s*/, '')
+    .replace(/^\(\d+\)\s*/, '').replace(/^[0-9]+\.\s*/, '').trim();
+}
+
+/**
+ * extractItemsFromSheet: 시트에서 모든 재무항목 추출 (세무사랑+위하고 겸용)
+ * 위하고 파서 실패 시 세무사랑 파서로 자동 fallback
+ */
+function extractItemsFromSheet(rows, fmtType) {
+  if (!fmtType) fmtType = detectFmt(rows);
+  if (fmtType.startsWith('sm_')) return extractItemsSm(rows, fmtType);
+
+  // === 위하고/기존 양식 ===
+  const items = [];
+  let ca, pa, cd, pd;
+  if (fmtType === 'pl7') { ca = 2; pa = 5; cd = 1; pd = 4; }
+  else { ca = 2; pa = 4; cd = 1; pd = 3; }
+
+  let startRow = 2;
+  const headerRows = findHeaderRows(rows);
+  if (headerRows.length > 0) {
+    // 헤더 다음 행이 서브헤더(금액/비율 등)인지 확인하여 동적 오프셋 결정
+    const hIdx = headerRows[0];
+    const nextRow = rows[hIdx + 1] || [];
+    const nextTxt = nextRow.map(c => String(c || '').replace(/\s/g, '')).join('');
+    const isSubHeader = /금액|비율|증감/.test(nextTxt) && !/[Ⅰ-Ⅹ]/.test(nextTxt);
+    startRow = isSubHeader ? hIdx + 2 : hIdx + 1;
+  } else {
+    // "과목" 헤더 없으면 → 텍스트+숫자가 함께 있는 첫 데이터행 탐색
+    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+      const row = rows[i] || [];
+      let hasText = false, hasNum = false;
+      for (let c = 0; c < row.length; c++) {
+        const v = String(row[c] || '').trim();
+        if (!v) continue;
+        if (isNaN(+v.replace(/,/g, ''))) hasText = true;
+        else if (Math.abs(+v.replace(/,/g, '')) > 0) hasNum = true;
+      }
+      if (hasText && hasNum && !isMetaRow(row)) { startRow = i; break; }
+    }
+  }
+
+  const skipRows = new Set();
+  if (headerRows.length > 1) {
+    for (let h = 1; h < headerRows.length; h++)
+      for (let r = Math.max(headerRows[h] - 6, 0); r <= headerRows[h] + 1; r++) {
+        const row = rows[r] || [];
+        if (isPageTitle(row) || isMetaRow(row)) skipRows.add(r);
+      }
+  }
+
+  for (let i = startRow; i < rows.length; i++) {
+    if (skipRows.has(i)) continue;
+    const row = rows[i] || [];
+
+    // 과목명 탐색: col 0에서 먼저, 없으면 col 1~3까지 스캔
+    let raw = '';
+    for (let c = 0; c < Math.min(row.length, 4); c++) {
+      const v = String(row[c] || '').trim();
+      if (!v || v === 'nan' || v === 'NaN') continue;
+      if (/^\d+$/.test(v)) continue;  // 순번만 있는 셀 건너뛰기
+      if (isNaN(+v.replace(/,/g, ''))) { raw = v; break; }
+    }
+    if (!raw || raw === '0') continue;
+    const cl = raw.replace(/\s/g, '');
+    if (['자산', '부채', '자본'].includes(cl)) continue;
+    if (/당기\s*:/.test(raw) || /전기\s*:/.test(raw)) continue;
+    if (cl === '(당기순이익)') continue;
+    if (isPageTitle([raw]) || isRepeatedHeader(row)) continue;
+
+    let curr = parseNum(row[ca]); let prev = parseNum(row[pa]);
+    if (curr === 0) curr = parseNum(row[cd]);
+    if (prev === 0) prev = parseNum(row[pd]);
+
+    const isDepr = cl.includes('감가상각누계') || cl.includes('국고보조금');
+    if (isDepr) {
+      const dC = parseNum(row[cd]); const dP = parseNum(row[pd]);
+      if (dC !== 0) curr = dC; if (dP !== 0) prev = dP;
+    }
+
+    const name = cleanName(raw);
+    items.push({ name, curr, prev, _cl: name.replace(/\s/g, '') });
+  }
+
+  // Fallback: 위하고 파서로 5개 미만이면 세무사랑 파서도 시도
+  if (items.length < 5) {
+    const smFmt = fmtType === 'pl7' ? 'sm_pl' : 'sm_bs';
+    const smItems = extractItemsSm(rows, smFmt);
+    if (smItems.length > items.length) return smItems;
+  }
+
+  return items;
+}
+
+/** extractItemsSm: 세무사랑 전용 파서 */
+function extractItemsSm(rows, fmtType) {
+  const items = [];
+  let ca, pa, cd, pd, nameCols;
+  if (fmtType === 'sm_bs') { ca = 6; pa = 8; cd = 5; pd = 7; nameCols = [4, 3, 2, 1]; }
+  else if (fmtType === 'sm_pl') { ca = 3; pa = 6; cd = 2; pd = 5; nameCols = [1]; }
+  else { ca = 4; pa = 6; cd = 3; pd = 5; nameCols = [2, 1]; }
+
+  let startRow = 2;
+  const headerRows = findHeaderRows(rows);
+  if (headerRows.length > 0) {
+    const hIdx = headerRows[0];
+    const nextRow = rows[hIdx + 1] || [];
+    const nextTxt = nextRow.map(c => String(c || '').replace(/\s/g, '')).join('');
+    const isSubHeader = /금액|비율|증감/.test(nextTxt) && !/[Ⅰ-Ⅹ]/.test(nextTxt);
+    startRow = isSubHeader ? hIdx + 2 : hIdx + 1;
+  }
+
+  const skipRows = new Set();
+  if (headerRows.length > 1) {
+    for (let h = 1; h < headerRows.length; h++)
+      for (let r = Math.max(headerRows[h] - 8, 0); r <= headerRows[h] + 1; r++) {
+        const row = rows[r] || [];
+        if (isPageTitle(row) || isMetaRow(row)) skipRows.add(r);
+      }
+  }
+
+  for (let i = startRow; i < rows.length; i++) {
+    if (skipRows.has(i)) continue;
+    const row = rows[i] || [];
+
+    let rawName = '';
+    for (const nc of nameCols) {
+      const v = String(row[nc] || '').trim();
+      if (v && v !== 'nan' && v !== 'NaN' && v !== '0' && v !== 'None' && isNaN(+v.replace(/,/g, ''))) { rawName = v; break; }
+    }
+    if (!rawName) {
+      const numCols = new Set([ca, pa, cd, pd]);
+      for (let c = 1; c < row.length; c++) {
+        if (numCols.has(c)) continue;
+        const v = String(row[c] || '').trim();
+        if (!v || v === 'nan' || v === 'NaN' || v === 'None') continue;
+        if (!isNaN(+v.replace(/,/g, ''))) continue;
+        if (/^[Ⅰ-Ⅹ]{1,3}\.?$/.test(v) || /^[①-⑩]$/.test(v) || /^\d+$/.test(v)) continue;
+        rawName = v; break;
+      }
+    }
+    if (!rawName) continue;
+
+    const cl = rawName.replace(/\s/g, '');
+    if (['자산', '부채', '자본'].includes(cl)) continue;
+    if (/당기\s*:/.test(rawName) || /전기\s*:/.test(rawName)) continue;
+    if (cl === '(당기순이익)' || cl.includes('비율')) continue;
+    if (isPageTitle(row)) continue;
+
+    let curr = parseNum(row[ca]); let prev = parseNum(row[pa]);
+    if (curr === 0) curr = parseNum(row[cd]);
+    if (prev === 0) prev = parseNum(row[pd]);
+
+    const isDepr = cl.includes('감가상각누계') || cl.includes('국고보조금');
+    if (isDepr) {
+      const dC = parseNum(row[cd]); const dP = parseNum(row[pd]);
+      if (dC !== 0) curr = dC; if (dP !== 0) prev = dP;
+    }
+
+    const cName = cleanName(rawName);
+    items.push({ name: cName, curr, prev, _cl: cName.replace(/\s/g, '') });
+  }
+  return items;
+}
+
+/** detectYearFromContent: 파일 내용에서 실제 사업연도 감지 */
+function detectYearFromContent(rows) {
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    for (const cell of (rows[i] || [])) {
+      const s = String(cell || '');
+      // "2024년 12월 31일", "2024.12.31", "2024-12-31"
+      const m = s.match(/(20[1-3]\d)\s*[년.\-\/]\s*12\s*[월.\-\/]?\s*31/);
+      if (m) return parseInt(m[1]);
+      // "2024.01.01부터 2024.12.31까지" or "2024.01.01 ~ 2024.12.31"
+      const m2 = s.match(/(20[1-3]\d)\s*[.\-\/]\s*12\s*[.\-\/]\s*31/);
+      if (m2) return parseInt(m2[1]);
+    }
+  }
+  // fallback: 연도 패턴이 포함된 기간 텍스트
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    for (const cell of (rows[i] || [])) {
+      const s = String(cell || '');
+      const m = s.match(/(20[1-3]\d)\s*년/);
+      if (m) return parseInt(m[1]);
+      // 제52(당)기 뒤에 날짜가 있는 경우
+      const m2 = s.match(/\(당\)\s*기.*?(20[1-3]\d)/);
+      if (m2) return parseInt(m2[1]);
+    }
+  }
+  return null;
+}
+
+/** detectSheetType: 시트가 BS인지 PL인지 판별 */
+function detectSheetType(rows, sheetName) {
+  const sn = (sheetName || '').replace(/\s/g, '');
+  if (sn.includes('재무상태') || sn.includes('대차대조')) return 'BS';
+  if (sn.includes('손익계산') || sn.includes('포괄손익')) return 'PL';
+
+  for (let i = 0; i < Math.min(rows.length, 8); i++) {
+    for (const cell of (rows[i] || [])) {
+      const s = String(cell || '').replace(/\s/g, '');
+      if (s.includes('재무상태표') || s.includes('대차대조표')) return 'BS';
+      if (s.includes('손익계산서') || s.includes('포괄손익')) return 'PL';
+    }
+  }
+
+  // 내용 기반: 자산총계가 있으면 BS, 매출액이 있으면 PL
+  let hasAsset = false, hasRevenue = false;
+  for (const row of rows) {
+    const txt = (row || []).map(c => String(c || '')).join('').replace(/\s/g, '');
+    if (txt.includes('자산총계')) hasAsset = true;
+    if (txt.includes('매출액') || txt.includes('영업이익')) hasRevenue = true;
+  }
+  if (hasAsset && !hasRevenue) return 'BS';
+  if (hasRevenue) return 'PL';
+  return 'UNKNOWN';
+}
+
+// 항목 매칭 키워드 (추출된 items의 name/_cl에서 검색)
+const ITEM_MATCH = {
+  totalAssets:   { keywords: ['자산총계','자산합계'], exactLevel: true },
+  currentAssets: { keywords: ['유동자산'], exactLevel: true },
+  totalEquity:   { keywords: ['자본총계','자본합계','자기자본합계'], exactLevel: true },
+  currentLiab:   { keywords: ['유동부채'], exactLevel: true },
+  capitalStock: { keywords: ['자본금'], exactStart: true },
+  stBorrow:     { keywords: ['단기차입금'], exactStart: true },
+  ltBorrow:     { keywords: ['장기차입금'], exactStart: true },
+  bonds:        { keywords: ['사채'], exactStart: true },
+  curLtDebt:    { keywords: ['유동성장기부채','유동성장기차입금'] },
+  tempRecv:     { keywords: ['가수금'], exactStart: true },
+  execBorrow:   { keywords: ['주임종단기차입금','임원단기차입금'] },
+  revenue:      { keywords: ['매출액'], exactStart: true },
+  opIncome:     { keywords: ['영업이익','영업이익(손실)'] },
+  finCost:      { keywords: ['이자비용','금융비용','금융원가'] },
+  netIncome:    { keywords: ['당기순이익','당기순손익','당기순이익(손실)'] },
+};
+
+/** mapItemsToInput: 추출된 items에서 필요한 항목을 찾아 inputData에 매핑 */
+function mapItemsToInput(items, curYear, prevYear, sheetType) {
+  let found = 0;
+
+  // BS 항목은 BS 시트에서만, PL 항목은 PL 시트에서만
+  const bsFields = ['totalAssets', 'currentAssets', 'totalEquity', 'currentLiab', 'capitalStock', 'stBorrow', 'ltBorrow', 'bonds', 'curLtDebt', 'tempRecv', 'execBorrow'];
+  const plFields = ['revenue', 'opIncome', 'finCost', 'netIncome'];
+  const allowedFields = sheetType === 'BS' ? bsFields : sheetType === 'PL' ? plFields : [...bsFields, ...plFields];
+
+  for (const [fieldId, rule] of Object.entries(ITEM_MATCH)) {
+    if (!allowedFields.includes(fieldId)) continue;
+
+    for (const item of items) {
+      const cl = item.name.replace(/\s/g, '');
+      let matched = false;
+
+      for (const kw of rule.keywords) {
+        const kwClean = kw.replace(/\s/g, '');
+        if (rule.exactStart) {
+          // "자본금"으로 시작하는 것만 (자본금 vs 자본잉여금 구분)
+          matched = cl === kwClean || cl.startsWith(kwClean + '(');
+        } else if (rule.exactLevel) {
+          matched = cl === kwClean;
+        } else {
+          matched = cl.includes(kwClean);
+        }
+        if (matched) break;
+      }
+
+      if (matched) {
+        if (!inputData[fieldId]) inputData[fieldId] = {};
+
+        if (curYear && item.curr !== 0 && inputData[fieldId][curYear] === undefined) {
+          inputData[fieldId][curYear] = item.curr;
+          found++;
+          addLog(`    ✓ ${fieldId} ${curYear}: ${formatNum(item.curr)}`);
+        }
+        if (prevYear && item.prev !== 0 && inputData[fieldId][prevYear] === undefined) {
+          inputData[fieldId][prevYear] = item.prev;
+          found++;
+          addLog(`    ✓ ${fieldId} ${prevYear}: ${formatNum(item.prev)}`);
+        }
+        break; // 첫 매치에서 중단 (총계/합계 우선)
+      }
+    }
+  }
+  return found;
+}
+
+/** extractDebtItems: BS 항목에서 부채 섹션의 모든 개별 항목 추출 */
+function extractDebtItems(items) {
+  const debtItems = [];
+  let inDebt = false;
+  // 부채 섹션 내 섹션 헤더 (건너뛸 항목)
+  const sectionNames = new Set(['유동부채','비유동부채','부채총계','부채합계','부채']);
+  const endNames = new Set(['부채총계','부채합계','자본총계','자본합계','자본']);
+
+  for (const item of items) {
+    const cl = item._cl || item.name.replace(/\s/g, '');
+    // 부채 섹션 시작
+    if (cl === '유동부채' || cl === '부채') { inDebt = true; continue; }
+    // 부채 섹션 종료
+    if (endNames.has(cl)) { inDebt = false; continue; }
+    if (!inDebt) continue;
+    // 섹션 헤더 건너뛰기
+    if (sectionNames.has(cl)) continue;
+    // 금액이 둘 다 0이면 건너뛰기
+    if (item.curr === 0 && item.prev === 0) continue;
+    debtItems.push(item);
+  }
+  return debtItems;
+}
+
+/** extractFromWorkbook: 워크북에서 데이터 추출 (통합 파서) */
+function extractFromWorkbook(wb, fileName) {
+  let totalFound = 0;
+
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (rows.length < 3) continue;
+
+    // 1. 양식 판별
+    const fmt = detectFmt(rows);
+    const sheetType = detectSheetType(rows, sheetName);
+    addLog(`  📋 시트: ${sheetName} [${sheetType}] (양식: ${fmt})`);
+
+    if (sheetType === 'UNKNOWN') {
+      addLog(`    유형 판별 불가 — 건너뜀`, true);
+      continue;
+    }
+
+    // 2. 사업연도 감지
+    const detectedYear = detectYearFromContent(rows);
+    let curYear, prevYear;
+    if (detectedYear) {
+      curYear = detectedYear;
+      prevYear = detectedYear - 1;
+      addLog(`    사업연도 감지: ${detectedYear}년 (당기=${curYear}, 전기=${prevYear})`);
+    } else {
+      // 당기/전기 라벨 기반 → 사용자 설정 당기 연도 사용
+      curYear = currentYear;
+      prevYear = currentYear - 1;
+      addLog(`    사업연도 감지 실패 → 사용자 설정 기준 (당기=${curYear}, 전기=${prevYear})`, true);
+    }
+
+    // 3. 항목 추출 (결재조서 파싱 엔진)
+    const items = extractItemsFromSheet(rows, fmt);
+    addLog(`    추출: ${items.length}개 항목`);
+    if (items.length > 0) {
+      const preview = items.slice(0, 8).map(it => it.name).join(', ');
+      addLog(`    항목 미리보기: ${preview}${items.length > 8 ? ' ...' : ''}`);
+    }
+
+    if (items.length === 0) {
+      addLog(`    항목 없음 — 건너뜀`, true);
+      continue;
+    }
+
+    // 4. 필요한 항목 매칭 & inputData에 매핑
+    const count = mapItemsToInput(items, curYear, prevYear, sheetType);
+    totalFound += count;
+    addLog(`    매핑완료: ${count}건`);
+
+    // 5. BS 시트: 부채 섹션 전체 항목을 동적으로 추가
+    if (sheetType === 'BS') {
+      const debtItems = extractDebtItems(items);
+      addLog(`    부채항목 추출: ${debtItems.length}개`);
+
+      for (const dItem of debtItems) {
+        const itemId = 'debt_' + (dItem._cl || dItem.name.replace(/\s/g, ''));
+        // 이미 삭제된 항목이면 무시
+        if (removedBorrowIds.has(itemId)) continue;
+        // 기존 BORROW_PARTS에 이미 매칭된 항목인지 확인
+        const matchesPredefined = BORROW_PARTS.some(bp =>
+          bp.keywords.some(kw => {
+            const kwCl = kw.replace(/\s/g, '');
+            const dCl = dItem._cl || dItem.name.replace(/\s/g, '');
+            return dCl === kwCl || dCl.startsWith(kwCl + '(');
+          })
+        );
+        if (matchesPredefined) continue;
+        // 이미 activeBorrowParts에 있으면 데이터만 갱신
+        const existing = activeBorrowParts.find(p => p.id === itemId);
+        if (existing) {
+          if (!inputData[itemId]) inputData[itemId] = {};
+          if (curYear && dItem.curr !== 0) inputData[itemId][curYear] = dItem.curr;
+          if (prevYear && dItem.prev !== 0) inputData[itemId][prevYear] = dItem.prev;
+          continue;
+        }
+        // 새 부채항목 → activeBorrowParts에 추가
+        activeBorrowParts.push({ id: itemId, label: dItem.name, keywords: [dItem.name], dynamic: true });
+        if (!inputData[itemId]) inputData[itemId] = {};
+        if (curYear && dItem.curr !== 0) inputData[itemId][curYear] = dItem.curr;
+        if (prevYear && dItem.prev !== 0) inputData[itemId][prevYear] = dItem.prev;
+        addLog(`    + 부채항목: ${dItem.name}`);
+      }
+    }
+  }
+
+  updateBorrowingSums();
+  return totalFound;
+}
+
+// ── 유틸리티 ──
+function parseNum(v) {
+  if (v == null || (typeof v === 'number' && isNaN(v))) return 0;
+  if (typeof v === 'number') return v;
+  let s = String(v).trim();
+  if (!s || s === 'nan' || s === 'NaN' || s === '-') return 0;
+  if (s.includes('△')) { s = s.replace('△', '').replace(/,/g, '').trim(); try { return -Math.abs(parseFloat(s)); } catch { return 0; } }
+  const isNeg = (s.startsWith('(') && s.endsWith(')')) || s.startsWith('-');
+  s = s.replace(/[^0-9.]/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : (isNeg ? -Math.abs(n) : n);
+}
+
+function formatNum(n) {
+  if (n === null || n === undefined || isNaN(n)) return '';
+  const isNeg = n < 0;
+  const abs = Math.abs(Math.round(n));
+  const formatted = abs.toLocaleString('ko-KR');
+  return isNeg ? `(${formatted})` : formatted;
+}
+
+function addLog(msg, isWarn) {
+  const log = document.getElementById('detectLog');
+  const div = document.createElement('div');
+  div.className = 'log-item' + (isWarn ? ' warn' : '');
+  div.textContent = msg;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ── 초기화 / 예시 ──
+function resetAll() {
+  if (!confirm('모든 입력 데이터를 초기화하시겠습니까?')) return;
+  inputData = {};
+  activeBorrowParts = [...BORROW_PARTS];
+  removedBorrowIds = new Set();
+  localStorage.removeItem('fin_ratio_data');
+  localStorage.removeItem('fin_ratio_borrow_parts');
+  localStorage.removeItem('fin_ratio_removed_borrows');
+  document.getElementById('fileList').innerHTML = '';
+  document.getElementById('detectLog').innerHTML = '';
+  document.getElementById('detectLog').classList.remove('show');
+  buildInputGrid();
+  calculate();
+}
+
+function loadSample() {
+  const y = currentYear;
+  // 이미지의 샘플 데이터 (2022~2024 기준 → 당기 연도에 맞게 매핑)
+  inputData = {
+    totalAssets:   { [y-3]: 3963, [y-2]: 4038, [y-1]: 3714 },
+    currentAssets: { [y-3]: 2100, [y-2]: 2200, [y-1]: 1900 },
+    totalEquity:   { [y-3]: 1151, [y-2]: 1358, [y-1]: 1581 },
+    currentLiab:   { [y-3]: 1800, [y-2]: 1600, [y-1]: 1200 },
+    capitalStock:  { [y-3]: 330,  [y-2]: 330,  [y-1]: 330 },
+    stBorrow:      { [y-3]: 306,  [y-2]: 686,  [y-1]: 818 },
+    revenue:       { [y-3]: 11684,[y-2]: 15141,[y-1]: 15337 },
+    opIncome:      { [y-3]: 306,  [y-2]: 432,  [y-1]: 443 },
+    finCost:       { [y-3]: 13,   [y-2]: 28,   [y-1]: 30 },
+    netIncome:     { [y-3]: 203,  [y-2]: 207,  [y-1]: 223 },
+  };
+  saveToStorage();
+  buildInputGrid();
+  calculate();
+}
+
+// ── 당기 연도 변경 ──
+document.getElementById('currentYear').addEventListener('change', function() {
+  currentYear = parseInt(this.value);
+  saveToStorage();
+  buildInputGrid();
+  updateYearHeaders();
+  calculate();
+});
+
+// ── 엑셀 다운로드 (ExcelJS) ──
+async function downloadExcel() {
+  const Y = currentYear;
+  const years = [Y-3, Y-2, Y-1, Y];           // 입력용 4개년
+  const dispYears = [Y-2, Y-1, Y];              // 표시용 3개년
+  const yCols = ['C','D','E','F'];               // 입력 시트 컬럼
+  const dCols = ['D','E','F'];                   // 표시용 (2023~2025에 해당)
+
+  const wb = new ExcelJS.Workbook();
+
+  // ═══ 색상 & 스타일 상수 ═══
+  const BLUE_FONT = { name: '맑은 고딕', size: 10, color: { argb: 'FF0000FF' } };
+  const GREEN_FONT = { name: '맑은 고딕', size: 10, color: { argb: 'FF008000' } };
+  const WHITE_FONT = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+  const LABEL_FONT = { name: '맑은 고딕', size: 10 };
+  const HDR_FONT = { name: '맑은 고딕', size: 10, bold: true };
+  const TITLE_FONT = { name: '맑은 고딕', size: 14, bold: true };
+  const SECTION_FONT = { name: '맑은 고딕', size: 12, bold: true };
+  const NOTE_FONT = { name: '맑은 고딕', size: 9, color: { argb: 'FF808080' } };
+  const DESC_FONT = { name: '맑은 고딕', size: 9, color: { argb: 'FF555555' } };
+  const UNIT_FONT = { name: '맑은 고딕', size: 9, color: { argb: 'FF808080' } };
+
+  const YELLOW_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
+  const SECTION_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB4C6E7' } };
+  const LHEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+  const DARK_BLUE_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+  const STRIPE_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+
+  const CENTER = { horizontal: 'center', vertical: 'middle' };
+  const LEFT_MID = { horizontal: 'left', vertical: 'middle' };
+  const RIGHT_MID = { horizontal: 'right', vertical: 'middle' };
+
+  const thinBorder = {
+    top: { style: 'thin' }, bottom: { style: 'thin' },
+    left: { style: 'thin' }, right: { style: 'thin' }
+  };
+  const bottomMedBorder = {
+    top: { style: 'thin' }, bottom: { style: 'medium' },
+    left: { style: 'thin' }, right: { style: 'thin' }
+  };
+
+  function applyInputCell(cell, val) {
+    if (val != null) cell.value = val;
+    cell.font = BLUE_FONT; cell.fill = YELLOW_FILL;
+    cell.alignment = RIGHT_MID; cell.border = thinBorder;
+    cell.numFmt = '#,##0';
+  }
+
+  function getVal(fid, y) {
+    return (inputData[fid] && inputData[fid][y] != null) ? inputData[fid][y] : null;
+  }
+
+  // ═══ Sheet 1: 입력 ═══
+  const ws1 = wb.addWorksheet('입력');
+  ws1.properties.defaultRowHeight = 17.4;
+  ws1.getColumn(1).width = 4;
+  ws1.getColumn(2).width = 24;
+  ws1.getColumn(3).width = 16;
+  ws1.getColumn(4).width = 16;
+  ws1.getColumn(5).width = 16;
+  ws1.getColumn(6).width = 16;
+
+  // Title
+  ws1.mergeCells('B1:F1');
+  const t1 = ws1.getCell('B1');
+  t1.value = '재무제표 데이터 입력'; t1.font = TITLE_FONT; t1.alignment = CENTER;
+  ws1.getRow(1).height = 24;
+
+  ws1.mergeCells('B2:F2');
+  const t2 = ws1.getCell('B2');
+  t2.value = '※ 파란색 셀에 데이터를 입력하세요 (단위: 백만원)';
+  t2.font = { name: '맑은 고딕', size: 9, color: { argb: 'FFFF0000' } };
+  t2.alignment = CENTER;
+  ws1.getRow(2).height = 16;
+
+  // ── 재무상태표 ──
+  ws1.mergeCells('B4:F4');
+  ws1.getCell('B4').value = '■ 재무상태표';
+  ws1.getCell('B4').font = SECTION_FONT; ws1.getCell('B4').fill = SECTION_FILL;
+  ws1.getRow(4).height = 20;
+
+  const hdrLabels = ['항목', ...years.map(y => y + '/12')];
+  hdrLabels.forEach((h, i) => {
+    const c = ws1.getCell(5, 2+i);
+    c.value = h; c.font = HDR_FONT; c.fill = LHEADER_FILL; c.alignment = CENTER; c.border = thinBorder;
+  });
+
+  // BS 항목: Row6=자산총계, 7=유동자산, 8=부채총계(수식), 9=유동부채, 10=자본총계, 11=자본금, 12=차입금
+  const bsItems = [
+    { label: '자산총계', id: 'totalAssets' },
+    { label: '유동자산', id: 'currentAssets' },
+    { label: '부채총계', formula: true },
+    { label: '유동부채', id: 'currentLiab' },
+    { label: '자본총계(자기자본)', id: 'totalEquity' },
+    { label: '자본금', id: 'capitalStock' },
+    { label: '차입금(단기+장기)', id: 'borrowings' },
+  ];
+
+  bsItems.forEach((item, ri) => {
+    const row = 6 + ri;
+    const lc = ws1.getCell(row, 2);
+    lc.value = item.label; lc.font = LABEL_FONT; lc.alignment = LEFT_MID; lc.border = thinBorder;
+
+    yCols.forEach((col, ci) => {
+      const cell = ws1.getCell(`${col}${row}`);
+      if (item.formula) {
+        // 부채총계 = 자산총계(Row6) - 자본총계(Row10)
+        cell.value = { formula: `${col}6-${col}10` };
+      } else {
+        const y = years[ci];
+        let v = getVal(item.id, y);
+        // 차입금 = 동적 부채 항목 합산
+        if (item.id === 'borrowings') {
+          const parts = getVisibleBorrowParts().map(p => p.id);
+          let sum = 0, hasAny = false;
+          for (const p of parts) { const pv = getVal(p, y); if (pv) { sum += pv; hasAny = true; } }
+          v = hasAny ? sum : null;
+        }
+        applyInputCell(cell, v);
+      }
+      if (item.formula) {
+        cell.font = BLUE_FONT; cell.fill = YELLOW_FILL;
+        cell.alignment = RIGHT_MID; cell.border = thinBorder;
+        cell.numFmt = '#,##0';
+      }
+    });
+  });
+
+  // 입력 시트 데이터 행높이
+  for (let r = 5; r <= 12; r++) ws1.getRow(r).height = 20;
+
+  // ── 손익계산서 ── (Row14부터)
+  ws1.mergeCells('B14:F14');
+  ws1.getCell('B14').value = '■ 손익계산서';
+  ws1.getCell('B14').font = SECTION_FONT; ws1.getCell('B14').fill = SECTION_FILL;
+  ws1.getRow(14).height = 20;
+
+  hdrLabels.forEach((h, i) => {
+    const c = ws1.getCell(15, 2+i);
+    c.value = h; c.font = HDR_FONT; c.fill = LHEADER_FILL; c.alignment = CENTER; c.border = thinBorder;
+  });
+
+  // PL 항목: Row16=매출액, 17=영업이익, 18=금융비용, 19=당기순이익
+  const plItems = [
+    { label: '매출액', id: 'revenue' },
+    { label: '영업이익', id: 'opIncome' },
+    { label: '금융비용(이자비용)', id: 'finCost' },
+    { label: '당기순이익', id: 'netIncome' },
+  ];
+
+  plItems.forEach((item, ri) => {
+    const row = 16 + ri;
+    const lc = ws1.getCell(row, 2);
+    lc.value = item.label; lc.font = LABEL_FONT; lc.alignment = LEFT_MID; lc.border = thinBorder;
+
+    yCols.forEach((col, ci) => {
+      const cell = ws1.getCell(`${col}${row}`);
+      applyInputCell(cell, getVal(item.id, years[ci]));
+    });
+  });
+
+  // PL 데이터 행높이
+  for (let r = 15; r <= 19; r++) ws1.getRow(r).height = 20;
+
+  // Note
+  ws1.mergeCells('B21:F21');
+  ws1.getCell('B21').value = `※ ${years[0]}년 데이터는 증가율 계산용으로 필요합니다 (주요재무사항에는 ${years[1]}~${years[3]}년만 표시)`;
+  ws1.getCell('B21').font = NOTE_FONT;
+
+  // 입력 sheet print settings
+  ws1.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    margins: { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1, header: 0, footer: 0 } };
+
+  // ═══ Sheet 2: 주요재무사항 ═══
+  const ws2 = wb.addWorksheet('주요재무사항');
+  ws2.properties.defaultRowHeight = 17.4;
+  ws2.getColumn(1).width = 2;
+  ws2.getColumn(2).width = 14;
+  ws2.getColumn(3).width = 14;
+  ws2.getColumn(4).width = 14;
+  ws2.getColumn(5).width = 14;
+  ws2.getColumn(6).width = 3;
+  ws2.getColumn(7).width = 18;
+  ws2.getColumn(8).width = 12;
+  ws2.getColumn(9).width = 12;
+  ws2.getColumn(10).width = 12;
+
+  // Title
+  ws2.mergeCells('B2:J2');
+  ws2.getCell('B2').value = '주요재무사항';
+  ws2.getCell('B2').font = { name: '맑은 고딕', size: 12, bold: true };
+  ws2.getRow(2).height = 24;
+
+  // 행높이 정리
+  ws2.getRow(3).height = 16;
+  for (let r = 4; r <= 12; r++) ws2.getRow(r).height = 20;
+
+  ws2.mergeCells('H3:J3');
+  ws2.getCell('H3').value = '(단위: 백만원, %)';
+  ws2.getCell('H3').font = UNIT_FONT; ws2.getCell('H3').alignment = RIGHT_MID;
+
+  // Left headers
+  const leftH = ['재무항목', ...dispYears.map(y => y+'/12')];
+  leftH.forEach((h, i) => {
+    const c = ws2.getCell(4, 2+i);
+    c.value = h; c.font = WHITE_FONT; c.fill = DARK_BLUE_FILL; c.alignment = CENTER; c.border = thinBorder;
+  });
+
+  // Right headers
+  const rightH = ['재무비율', ...dispYears.map(y => y+'/12')];
+  rightH.forEach((h, i) => {
+    const c = ws2.getCell(4, 7+i);
+    c.value = h; c.font = WHITE_FONT; c.fill = DARK_BLUE_FILL; c.alignment = CENTER; c.border = thinBorder;
+  });
+
+  // Left table: 재무항목 (10개) → 입력 sheet 참조
+  // 입력 시트 행: 자산총계=6, 유동자산=7, 유동부채=9, 자본총계=10, 자본금=11, 차입금=12, 매출액=16, 영업이익=17, 금융비용=18, 당기순이익=19
+  const leftItems = [
+    { label: '총자산',     iRow: 6 },
+    { label: '유동자산',   iRow: 7 },
+    { label: '자기자본',   iRow: 10 },
+    { label: '유동부채',   iRow: 9 },
+    { label: '자본금',     iRow: 11 },
+    { label: '차입금',     iRow: 12 },
+    { label: '금융비용',   iRow: 18 },
+    { label: '매출액',     iRow: 16 },
+    { label: '영업이익',   iRow: 17 },
+    { label: '당기순이익', iRow: 19 },
+  ];
+
+  // Right table: 재무비율 (13개)
+  // 입력 시트 참조: C=Y-3, D=Y-2, E=Y-1, F=Y
+  // Row: 총자산=6, 유동자산=7, 유동부채=9, 자본총계=10, 차입금=12, 매출액=16, 영업이익=17, 금융비용=18, 당기순이익=19
+  const ratioItems = [
+    { label: '순이익증가율(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!C19=0,"-",ROUND((입력!D19-입력!C19)/ABS(입력!C19)*100,1))`,
+        `IF(입력!D19=0,"-",ROUND((입력!E19-입력!D19)/ABS(입력!D19)*100,1))`,
+        `IF(입력!E19=0,"-",ROUND((입력!F19-입력!E19)/ABS(입력!E19)*100,1))`,
+      ]},
+    { label: '자기자본비율(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D6=0,"-",ROUND(입력!D10/입력!D6*100,1))`,
+        `IF(입력!E6=0,"-",ROUND(입력!E10/입력!E6*100,1))`,
+        `IF(입력!F6=0,"-",ROUND(입력!F10/입력!F6*100,1))`,
+      ]},
+    { label: '부채비율(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D10=0,"-",ROUND((입력!D6-입력!D10)/입력!D10*100,1))`,
+        `IF(입력!E10=0,"-",ROUND((입력!E6-입력!E10)/입력!E10*100,1))`,
+        `IF(입력!F10=0,"-",ROUND((입력!F6-입력!F10)/입력!F10*100,1))`,
+      ]},
+    { label: '차입금의존도(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D6=0,"-",ROUND(입력!D12/입력!D6*100,1))`,
+        `IF(입력!E6=0,"-",ROUND(입력!E12/입력!E6*100,1))`,
+        `IF(입력!F6=0,"-",ROUND(입력!F12/입력!F6*100,1))`,
+      ]},
+    { label: '유동부채비율(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D10=0,"-",ROUND(입력!D9/입력!D10*100,1))`,
+        `IF(입력!E10=0,"-",ROUND(입력!E9/입력!E10*100,1))`,
+        `IF(입력!F10=0,"-",ROUND(입력!F9/입력!F10*100,1))`,
+      ]},
+    { label: '유동비율(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D9=0,"-",ROUND(입력!D7/입력!D9*100,1))`,
+        `IF(입력!E9=0,"-",ROUND(입력!E7/입력!E9*100,1))`,
+        `IF(입력!F9=0,"-",ROUND(입력!F7/입력!F9*100,1))`,
+      ]},
+    { label: '금융비용부담률(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D16=0,"-",ROUND(입력!D18/입력!D16*100,1))`,
+        `IF(입력!E16=0,"-",ROUND(입력!E18/입력!E16*100,1))`,
+        `IF(입력!F16=0,"-",ROUND(입력!F18/입력!F16*100,1))`,
+      ]},
+    { label: '이자보상배율(배)', fmt: '0.0"배"',
+      formulas: [
+        `IF(입력!D18=0,"-",ROUND(입력!D17/입력!D18,1))`,
+        `IF(입력!E18=0,"-",ROUND(입력!E17/입력!E18,1))`,
+        `IF(입력!F18=0,"-",ROUND(입력!F17/입력!F18,1))`,
+      ]},
+    { label: '매출액증가율(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!C16=0,"-",ROUND((입력!D16-입력!C16)/ABS(입력!C16)*100,1))`,
+        `IF(입력!D16=0,"-",ROUND((입력!E16-입력!D16)/ABS(입력!D16)*100,1))`,
+        `IF(입력!E16=0,"-",ROUND((입력!F16-입력!E16)/ABS(입력!E16)*100,1))`,
+      ]},
+    { label: '매출액영업이익률(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D16=0,"-",ROUND(입력!D17/입력!D16*100,1))`,
+        `IF(입력!E16=0,"-",ROUND(입력!E17/입력!E16*100,1))`,
+        `IF(입력!F16=0,"-",ROUND(입력!F17/입력!F16*100,1))`,
+      ]},
+    { label: '매출액순이익률(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D16=0,"-",ROUND(입력!D19/입력!D16*100,1))`,
+        `IF(입력!E16=0,"-",ROUND(입력!E19/입력!E16*100,1))`,
+        `IF(입력!F16=0,"-",ROUND(입력!F19/입력!F16*100,1))`,
+      ]},
+    { label: '총자산순이익률(ROA)(%)', fmt: '0.0"%"',
+      formulas: [
+        `IF(입력!D6=0,"-",ROUND(입력!D19/입력!D6*100,1))`,
+        `IF(입력!E6=0,"-",ROUND(입력!E19/입력!E6*100,1))`,
+        `IF(입력!F6=0,"-",ROUND(입력!F19/입력!F6*100,1))`,
+      ]},
+    { label: '자산회전율(회)', fmt: '0.0"회"',
+      formulas: [
+        `IF(입력!D6=0,"-",ROUND(입력!D16/입력!D6,1))`,
+        `IF(입력!E6=0,"-",ROUND(입력!E16/입력!E6,1))`,
+        `IF(입력!F6=0,"-",ROUND(입력!F16/입력!F6,1))`,
+      ]},
+  ];
+
+  const maxItems = Math.max(leftItems.length, ratioItems.length);
+  const lastDataRow = 4 + maxItems;
+
+  // Left table 렌더링
+  leftItems.forEach((item, ri) => {
+    const row = 5 + ri;
+    const isOdd = ri % 2 === 0;
+    const fill = isOdd ? STRIPE_FILL : null;
+    const border = row === lastDataRow ? bottomMedBorder : thinBorder;
+
+    const lc = ws2.getCell(row, 2);
+    lc.value = item.label; lc.font = LABEL_FONT;
+    if (fill) lc.fill = fill;
+    lc.alignment = LEFT_MID; lc.border = border;
+
+    dCols.forEach((col, ci) => {
+      const cell = ws2.getCell(row, 3+ci);
+      cell.value = { formula: `ROUND(입력!${col}${item.iRow}/1000000,0)` };
+      cell.font = GREEN_FONT;
+      if (fill) cell.fill = fill;
+      cell.alignment = RIGHT_MID; cell.border = border;
+      cell.numFmt = '#,##0';
+    });
+  });
+
+  // Left 빈 행 (우측이 더 길 경우)
+  for (let ri = leftItems.length; ri < maxItems; ri++) {
+    const row = 5 + ri;
+    const border = row === lastDataRow ? bottomMedBorder : thinBorder;
+    ws2.getCell(row, 2).border = border;
+    dCols.forEach((col, ci) => { ws2.getCell(row, 3+ci).border = border; });
+  }
+
+  // Right table 렌더링
+  ratioItems.forEach((item, ri) => {
+    const row = 5 + ri;
+    const isOdd = ri % 2 === 0;
+    const fill = isOdd ? STRIPE_FILL : null;
+    const border = row === lastDataRow ? bottomMedBorder : thinBorder;
+
+    const lc = ws2.getCell(row, 7);
+    lc.value = item.label; lc.font = LABEL_FONT;
+    if (fill) lc.fill = fill;
+    lc.alignment = LEFT_MID; lc.border = border;
+
+    item.formulas.forEach((f, ci) => {
+      const cell = ws2.getCell(row, 8+ci);
+      cell.value = { formula: f };
+      cell.font = GREEN_FONT;
+      if (fill) cell.fill = fill;
+      cell.alignment = RIGHT_MID; cell.border = border;
+      cell.numFmt = item.fmt || '0.0';
+    });
+  });
+
+  // 산출기준 section
+  const descStartRow = lastDataRow + 2;
+  ws2.mergeCells(`B${descStartRow}:J${descStartRow}`);
+  ws2.getCell(`B${descStartRow}`).value = '산출기준';
+  ws2.getCell(`B${descStartRow}`).font = { name: '맑은 고딕', size: 10, bold: true };
+
+  const descs = [
+    '• 순이익증가율(%) = (당기순이익 - 전기순이익) ÷ |전기순이익| × 100',
+    '• 자기자본비율(%) = 자본총계 ÷ 자산총계 × 100',
+    '• 부채비율(%) = 부채총계 ÷ 자본총계 × 100',
+    '• 차입금의존도(%) = 차입금 ÷ 자산총계 × 100',
+    '• 유동부채비율(%) = 유동부채 ÷ 자본총계 × 100',
+    '• 유동비율(%) = 유동자산 ÷ 유동부채 × 100',
+    '• 금융비용부담률(%) = 금융비용(이자비용) ÷ 매출액 × 100',
+    '• 이자보상배율(배) = 영업이익 ÷ 금융비용(이자비용)',
+    '• 매출액증가율(%) = (당기매출액 - 전기매출액) ÷ |전기매출액| × 100',
+    '• 매출액영업이익률(%) = 영업이익 ÷ 매출액 × 100',
+    '• 매출액순이익률(%) = 당기순이익 ÷ 매출액 × 100',
+    '• 총자산순이익률(ROA)(%) = 당기순이익 ÷ 총자산 × 100',
+    '• 자산회전율(회) = 매출액 ÷ 총자산',
+  ];
+  descs.forEach((d, i) => {
+    const row = descStartRow + 1 + i;
+    ws2.mergeCells(`B${row}:J${row}`);
+    ws2.getCell(`B${row}`).value = d;
+    ws2.getCell(`B${row}`).font = DESC_FONT;
+  });
+
+  // Print settings
+  const printEndRow = descStartRow + 1 + descs.length + 1;
+  ws2.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    margins: { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1, header: 0, footer: 0 },
+    printArea: `A1:J${printEndRow}` };
+
+  // ═══ 다운로드 ═══
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `주요재무사항_${Y}년_계산기.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── 시작 ──
+init();
+</script>
+</body>
+</html>
