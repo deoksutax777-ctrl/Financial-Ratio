@@ -77,7 +77,7 @@ header p { font-size: 13px; color: #718096; }
 
 /* Result section */
 .result-wrapper { overflow-x: auto; }
-.result-table { width: 100%; border-collapse: collapse; min-width: 900px; }
+.result-table { width: 100%; border-collapse: collapse; min-width: 1100px; }
 .result-table th { padding: 10px 14px; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; }
 .result-table td { padding: 9px 14px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
 .result-table .label-col { font-weight: 500; text-align: left; white-space: nowrap; }
@@ -89,7 +89,7 @@ header p { font-size: 13px; color: #718096; }
 .result-table th.left-header:first-child { border-radius: 6px 0 0 0; }
 /* Right table header */
 .result-table th.right-header { background: #2f855a; color: #fff; }
-.result-table th.right-header:last-child { border-radius: 0 6px 0 0; }
+.result-table th.right-header.last-rh { border-radius: 0 6px 0 0; }
 
 .result-table tbody tr:nth-child(odd) td:not(.spacer-col) { background: #fafafa; }
 .result-table tbody tr:hover td:not(.spacer-col) { background: #ebf8ff; }
@@ -111,12 +111,34 @@ header p { font-size: 13px; color: #718096; }
 /* Print actions */
 .print-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
+/* Standard ratio selector */
+.std-selector { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 12px 16px; background: #f0fff4; border-radius: 8px; flex-wrap: wrap; }
+.std-selector label { font-weight: bold; font-size: 14px; color: #2f855a; }
+.std-selector select { padding: 6px 12px; border: 1px solid #9ae6b4; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff; }
+.std-selector .std-hint { font-size: 12px; color: #718096; margin-left: auto; }
+
+/* Standard ratio header */
+.result-table th.std-header { background: #c05621; color: #fff; }
+.result-table th.std-header:last-child { border-radius: 0 6px 0 0; }
+.result-table .std-col { text-align: right; font-family: 'Consolas', 'D2Coding', monospace; }
+.result-table .std-col input[type="text"] {
+  width: 80px; padding: 4px 6px; border: 1px solid #e2e8f0; border-radius: 4px;
+  font-size: 12px; font-family: 'Consolas', 'D2Coding', monospace; text-align: right;
+  background: #fffaf0; transition: border-color 0.2s;
+}
+.result-table .std-col input[type="text"]:focus { outline: none; border-color: #ed8936; background: #fff; box-shadow: 0 0 0 3px rgba(237,137,54,0.15); }
+.std-compare-good { color: #2f855a; font-weight: 600; }
+.std-compare-bad { color: #e53e3e; font-weight: 600; }
+.std-compare-neutral { color: #718096; }
+
 /* Print styles */
 @media print {
   body { background: #fff; }
   .container { padding: 0; max-width: 100%; }
   .card { box-shadow: none; border: none; padding: 12px 0; }
-  .upload-card, .input-card, .print-actions, header p, .year-selector .hint { display: none !important; }
+  .upload-card, .input-card, .print-actions, header p, .year-selector .hint, .std-selector .std-hint { display: none !important; }
+  .std-selector select { border: none; background: none; padding: 0; }
+  .result-table .std-col input[type="text"] { border: none; background: none; padding: 0; font-size: 11px; }
   .year-selector { background: none; padding: 0; margin-bottom: 8px; }
   .result-table { font-size: 11px; min-width: 0; }
   .result-table th, .result-table td { padding: 6px 10px; }
@@ -190,6 +212,29 @@ header p { font-size: 13px; color: #718096; }
   <!-- 결과 표시 -->
   <div class="card" id="resultCard">
     <h2><span class="icon">📊</span> 주요재무사항</h2>
+    <div class="std-selector">
+      <label>업종 기준비율:</label>
+      <select id="stdType" onchange="onStdTypeChange()">
+        <option value="general">종합건설업</option>
+        <option value="special">전문건설업</option>
+      </select>
+      <select id="stdSubType" style="display:none;" onchange="onStdSubTypeChange()">
+        <option value="전체">전체 평균</option>
+        <option value="지반조성·포장">지반조성·포장</option>
+        <option value="실내건축">실내건축</option>
+        <option value="금속·지붕">금속·지붕</option>
+        <option value="도장·습식방수·석공">도장·습식방수·석공</option>
+        <option value="조경식재·시설물">조경식재·시설물</option>
+        <option value="철근콘크리트">철근콘크리트</option>
+        <option value="구조물해체·비계">구조물해체·비계</option>
+        <option value="상하수도">상하수도</option>
+        <option value="철도궤도">철도궤도</option>
+        <option value="철강구조물">철강구조물</option>
+        <option value="수중·준설">수중·준설</option>
+        <option value="승강기·삭도">승강기·삭도</option>
+      </select>
+      <span class="std-hint">기준비율을 직접 수정할 수 있습니다 (2024년도 말 기준)</span>
+    </div>
     <div class="unit-label" id="unitLabel"></div>
     <div class="result-wrapper">
       <table class="result-table" id="resultTable">
@@ -452,13 +497,16 @@ function calculate() {
   const years = getYears();
 
   // 결과 테이블 헤더
+  const stdRatios = getCurrentStdRatios();
+  const stdLabel = currentStdType === 'general' ? '종합건설' : (currentStdSub === '전체' ? '전문건설' : currentStdSub);
   const head = document.getElementById('resultHead');
   head.innerHTML = `
     <th class="left-header" style="border-radius:6px 0 0 0;">재무항목</th>
     ${displayYears.map(y => `<th class="left-header">${y}/12</th>`).join('')}
     <th class="spacer-col"></th>
     <th class="right-header">재무비율</th>
-    ${displayYears.map((y,i) => `<th class="right-header" ${i===displayYears.length-1?'style="border-radius:0 6px 0 0;"':''}>${y}/12</th>`).join('')}
+    ${displayYears.map(y => `<th class="right-header">${y}/12</th>`).join('')}
+    <th class="std-header" style="border-radius:0 6px 0 0;">기준비율<br><span style="font-size:10px;font-weight:normal;">(${stdLabel})</span></th>
   `;
 
   document.getElementById('unitLabel').textContent = `(단위: 백만원, %, 배, 회)`;
@@ -499,20 +547,21 @@ function calculate() {
     };
   });
 
+  // stdKey mapping: rightDefs key → STD_RATIOS key
   const rightDefs = [
-    { key: '순이익증가율',     label: '순이익증가율(%)',          unit: '%' },
-    { key: '자기자본비율',     label: '자기자본비율(%)',          unit: '%' },
-    { key: '부채비율',         label: '부채비율(%)',              unit: '%' },
-    { key: '차입금의존도',     label: '차입금의존도(%)',          unit: '%' },
-    { key: '유동부채비율',     label: '유동부채비율(%)',          unit: '%' },
-    { key: '유동비율',         label: '유동비율(%)',              unit: '%' },
-    { key: '금융비용부담률',   label: '금융비용부담률(%)',        unit: '%' },
-    { key: '이자보상배율',     label: '이자보상배율(배)',         unit: '배' },
-    { key: '매출액증가율',     label: '매출액증가율(%)',          unit: '%' },
-    { key: '매출액영업이익률', label: '매출액영업이익률(%)',      unit: '%' },
-    { key: '매출액순이익률',   label: '매출액순이익률(%)',        unit: '%' },
-    { key: '총자산순이익률',   label: '총자산순이익률(ROA)(%)',   unit: '%' },
-    { key: '자산회전율',       label: '자산회전율(회)',           unit: '회' },
+    { key: '순이익증가율',     label: '순이익증가율(%)',          unit: '%', stdKey: null },
+    { key: '자기자본비율',     label: '자기자본비율(%)',          unit: '%', stdKey: null },
+    { key: '부채비율',         label: '부채비율(%)',              unit: '%', stdKey: '부채비율' },
+    { key: '차입금의존도',     label: '차입금의존도(%)',          unit: '%', stdKey: '차입금의존도' },
+    { key: '유동부채비율',     label: '유동부채비율(%)',          unit: '%', stdKey: null },
+    { key: '유동비율',         label: '유동비율(%)',              unit: '%', stdKey: '유동비율' },
+    { key: '금융비용부담률',   label: '금융비용부담률(%)',        unit: '%', stdKey: null },
+    { key: '이자보상배율',     label: '이자보상배율(배)',         unit: '배', stdKey: '이자보상배율' },
+    { key: '매출액증가율',     label: '매출액증가율(%)',          unit: '%', stdKey: null },
+    { key: '매출액영업이익률', label: '매출액영업이익률(%)',      unit: '%', stdKey: '매출액영업이익률' },
+    { key: '매출액순이익률',   label: '매출액순이익률(%)',        unit: '%', stdKey: '매출액순이익률' },
+    { key: '총자산순이익률',   label: '총자산순이익률(ROA)(%)',   unit: '%', stdKey: '총자산순이익률' },
+    { key: '자산회전율',       label: '자산회전율(회)',           unit: '회', stdKey: '자산회전율' },
   ];
 
   const tbody = document.getElementById('resultBody');
@@ -537,19 +586,32 @@ function calculate() {
       html += `<td class="spacer-col"></td>`;
       tr.innerHTML = html;
     }
+
     // 우측
     if (i < rightDefs.length) {
       const rd = rightDefs[i];
       let rHtml = `<td class="label-col">${rd.label}</td>`;
+      // 당기(마지막 연도) 값 - 기준비율 비교용
+      const lastYrVal = rightRows[displayYears.length - 1][rd.key];
       for (let j = 0; j < displayYears.length; j++) {
         const v = rightRows[j][rd.key];
         const txt = v !== null ? v.toFixed(1) + rd.unit : '-';
         rHtml += `<td class="value-col">${txt}</td>`;
       }
+      // 기준비율 컬럼
+      if (rd.stdKey && stdRatios[rd.stdKey] !== undefined) {
+        const sv = stdRatios[rd.stdKey];
+        const cmpClass = compareStd(rd.key, lastYrVal, sv);
+        const escapedKey = rd.stdKey.replace(/'/g, "\\'");
+        rHtml += `<td class="std-col"><input type="text" value="${sv}" onchange="onStdInputChange('${escapedKey}', this.value); calculate();" title="기준: ${sv}${rd.unit}"><span class="${cmpClass}" style="font-size:11px; margin-left:2px;">${rd.unit}</span></td>`;
+      } else {
+        rHtml += `<td class="std-col" style="color:#cbd5e0; text-align:center; font-size:11px;">-</td>`;
+      }
       tr.innerHTML += rHtml;
     } else {
       let rHtml = `<td class="label-col"></td>`;
       for (const yr of displayYears) rHtml += `<td class="value-col"></td>`;
+      rHtml += `<td class="std-col"></td>`;
       tr.innerHTML += rHtml;
     }
     tbody.appendChild(tr);
@@ -1152,9 +1214,18 @@ function resetAll() {
   inputData = {};
   activeBorrowParts = [...BORROW_PARTS];
   removedBorrowIds = new Set();
+  stdOverrides = {};
+  currentStdType = 'general';
+  currentStdSub = '전체';
   localStorage.removeItem('fin_ratio_data');
   localStorage.removeItem('fin_ratio_borrow_parts');
   localStorage.removeItem('fin_ratio_removed_borrows');
+  localStorage.removeItem('fin_ratio_std_type');
+  localStorage.removeItem('fin_ratio_std_sub');
+  localStorage.removeItem('fin_ratio_std_overrides');
+  document.getElementById('stdType').value = 'general';
+  document.getElementById('stdSubType').value = '전체';
+  document.getElementById('stdSubType').style.display = 'none';
   document.getElementById('fileList').innerHTML = '';
   document.getElementById('detectLog').innerHTML = '';
   document.getElementById('detectLog').classList.remove('show');
@@ -1379,7 +1450,7 @@ async function downloadExcel() {
   ws2.getColumn(10).width = 12;
 
   // Title
-  ws2.mergeCells('B2:J2');
+  ws2.mergeCells('B2:K2');
   ws2.getCell('B2').value = '주요재무사항';
   ws2.getCell('B2').font = { name: '맑은 고딕', size: 12, bold: true };
   ws2.getRow(2).height = 24;
@@ -1388,7 +1459,7 @@ async function downloadExcel() {
   ws2.getRow(3).height = 16;
   for (let r = 4; r <= 12; r++) ws2.getRow(r).height = 20;
 
-  ws2.mergeCells('H3:J3');
+  ws2.mergeCells('H3:K3');
   ws2.getCell('H3').value = '(단위: 백만원, %)';
   ws2.getCell('H3').font = UNIT_FONT; ws2.getCell('H3').alignment = RIGHT_MID;
 
@@ -1405,6 +1476,15 @@ async function downloadExcel() {
     const c = ws2.getCell(4, 7+i);
     c.value = h; c.font = WHITE_FONT; c.fill = DARK_BLUE_FILL; c.alignment = CENTER; c.border = thinBorder;
   });
+
+  // Standard ratio column header
+  const ORANGE_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC05621' } };
+  const stdRatiosExcel = getCurrentStdRatios();
+  const stdLabelExcel = currentStdType === 'general' ? '종합건설' : (currentStdSub === '전체' ? '전문건설' : currentStdSub);
+  ws2.getColumn(11).width = 14;
+  const stdHdrCell = ws2.getCell(4, 11);
+  stdHdrCell.value = '기준비율\n(' + stdLabelExcel + ')';
+  stdHdrCell.font = WHITE_FONT; stdHdrCell.fill = ORANGE_FILL; stdHdrCell.alignment = { ...CENTER, wrapText: true }; stdHdrCell.border = thinBorder;
 
   // Left table: 재무항목 (10개) → 입력 sheet 참조
   // 입력 시트 행: 자산총계=6, 유동자산=7, 유동부채=9, 자본총계=10, 자본금=11, 차입금=12, 매출액=16, 영업이익=17, 금융비용=18, 당기순이익=19
@@ -1538,6 +1618,10 @@ async function downloadExcel() {
     dCols.forEach((col, ci) => { ws2.getCell(row, 3+ci).border = border; });
   }
 
+  // stdKey mapping for Excel
+  const ratioStdKeys = [null, null, '부채비율', '차입금의존도', null, '유동비율', null, '이자보상배율', null, '매출액영업이익률', '매출액순이익률', '총자산순이익률', '자산회전율'];
+  const ORANGE_LIGHT = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3E0' } };
+
   // Right table 렌더링
   ratioItems.forEach((item, ri) => {
     const row = 5 + ri;
@@ -1558,11 +1642,25 @@ async function downloadExcel() {
       cell.alignment = RIGHT_MID; cell.border = border;
       cell.numFmt = item.fmt || '0.0';
     });
+
+    // Standard ratio column
+    const stdKey = ratioStdKeys[ri];
+    const stdCell = ws2.getCell(row, 11);
+    if (stdKey && stdRatiosExcel[stdKey] !== undefined) {
+      stdCell.value = stdRatiosExcel[stdKey];
+      stdCell.font = { name: '맑은 고딕', size: 10, color: { argb: 'FFC05621' } };
+      stdCell.fill = ORANGE_LIGHT;
+      stdCell.numFmt = item.fmt || '0.0';
+    } else {
+      stdCell.value = '-';
+      stdCell.font = { name: '맑은 고딕', size: 9, color: { argb: 'FFAAAAAA' } };
+    }
+    stdCell.alignment = RIGHT_MID; stdCell.border = border;
   });
 
   // 산출기준 section
   const descStartRow = lastDataRow + 2;
-  ws2.mergeCells(`B${descStartRow}:J${descStartRow}`);
+  ws2.mergeCells(`B${descStartRow}:K${descStartRow}`);
   ws2.getCell(`B${descStartRow}`).value = '산출기준';
   ws2.getCell(`B${descStartRow}`).font = { name: '맑은 고딕', size: 10, bold: true };
 
@@ -1583,7 +1681,7 @@ async function downloadExcel() {
   ];
   descs.forEach((d, i) => {
     const row = descStartRow + 1 + i;
-    ws2.mergeCells(`B${row}:J${row}`);
+    ws2.mergeCells(`B${row}:K${row}`);
     ws2.getCell(`B${row}`).value = d;
     ws2.getCell(`B${row}`).font = DESC_FONT;
   });
@@ -1592,7 +1690,7 @@ async function downloadExcel() {
   const printEndRow = descStartRow + 1 + descs.length + 1;
   ws2.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
     margins: { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1, header: 0, footer: 0 },
-    printArea: `A1:J${printEndRow}` };
+    printArea: `A1:K${printEndRow}` };
 
   // ═══ 다운로드 ═══
   const buf = await wb.xlsx.writeBuffer();
@@ -1607,7 +1705,127 @@ async function downloadExcel() {
   URL.revokeObjectURL(url);
 }
 
+// ── 업종 기준비율 데이터 ──
+const STD_RATIOS = {
+  general: {
+    label: '종합건설업',
+    부채비율: 111.36,
+    유동비율: 135.45,
+    차입금의존도: 22.61,
+    이자보상배율: 1.86,
+    매출액영업이익률: 3.15,
+    매출액순이익률: 2.42,
+    총자산순이익률: 1.76,
+    자산회전율: 0.74,
+    // 종합건설 추가 항목 (참고용)
+    총자산대비영업현금흐름비율: 1.25,
+    건설기술개발투자비율: 0.07,
+  },
+  special: {
+    '전체': { label: '전문건설업 전체', 부채비율: 98.05, 유동비율: 141.96 },
+    '지반조성·포장': { label: '지반조성·포장', 부채비율: 61.30, 유동비율: 209.76 },
+    '실내건축': { label: '실내건축', 부채비율: 68.71, 유동비율: 154.39 },
+    '금속·지붕': { label: '금속·지붕', 부채비율: 73.86, 유동비율: 152.54 },
+    '도장·습식방수·석공': { label: '도장·습식방수·석공', 부채비율: 63.44, 유동비율: 182.84 },
+    '조경식재·시설물': { label: '조경식재·시설물', 부채비율: 86.11, 유동비율: 137.34 },
+    '철근콘크리트': { label: '철근콘크리트', 부채비율: 64.75, 유동비율: 204.50 },
+    '구조물해체·비계': { label: '구조물해체·비계', 부채비율: 65.69, 유동비율: 151.78 },
+    '상하수도': { label: '상하수도', 부채비율: 55.60, 유동비율: 223.57 },
+    '철도궤도': { label: '철도궤도', 부채비율: 158.93, 유동비율: 157.19 },
+    '철강구조물': { label: '철강구조물', 부채비율: 144.52, 유동비율: 123.91 },
+    '수중·준설': { label: '수중·준설', 부채비율: 125.84, 유동비율: 154.60 },
+    '승강기·삭도': { label: '승강기·삭도', 부채비율: 78.01, 유동비율: 110.92 },
+  }
+};
+
+// 현재 선택된 기준비율 (사용자 편집 가능)
+let currentStdType = 'general';
+let currentStdSub = '전체';
+let stdOverrides = {}; // 사용자가 직접 수정한 값 { 'general': { 부채비율: 120 }, 'special_전체': { 부채비율: 100 } }
+
+function loadStdFromStorage() {
+  try {
+    const t = localStorage.getItem('fin_ratio_std_type');
+    if (t) currentStdType = t;
+    const s = localStorage.getItem('fin_ratio_std_sub');
+    if (s) currentStdSub = s;
+    const o = localStorage.getItem('fin_ratio_std_overrides');
+    if (o) stdOverrides = JSON.parse(o);
+    document.getElementById('stdType').value = currentStdType;
+    document.getElementById('stdSubType').value = currentStdSub;
+    document.getElementById('stdSubType').style.display = currentStdType === 'special' ? '' : 'none';
+  } catch(e) {}
+}
+
+function saveStdToStorage() {
+  try {
+    localStorage.setItem('fin_ratio_std_type', currentStdType);
+    localStorage.setItem('fin_ratio_std_sub', currentStdSub);
+    localStorage.setItem('fin_ratio_std_overrides', JSON.stringify(stdOverrides));
+  } catch(e) {}
+}
+
+function getStdKey() {
+  return currentStdType === 'general' ? 'general' : 'special_' + currentStdSub;
+}
+
+function getCurrentStdRatios() {
+  let base = {};
+  if (currentStdType === 'general') {
+    base = { ...STD_RATIOS.general };
+  } else {
+    base = { ...(STD_RATIOS.special[currentStdSub] || STD_RATIOS.special['전체']) };
+  }
+  // 사용자 수정값 적용
+  const overrides = stdOverrides[getStdKey()] || {};
+  for (const k of Object.keys(overrides)) {
+    base[k] = overrides[k];
+  }
+  return base;
+}
+
+function onStdTypeChange() {
+  currentStdType = document.getElementById('stdType').value;
+  document.getElementById('stdSubType').style.display = currentStdType === 'special' ? '' : 'none';
+  saveStdToStorage();
+  calculate();
+}
+
+function onStdSubTypeChange() {
+  currentStdSub = document.getElementById('stdSubType').value;
+  saveStdToStorage();
+  calculate();
+}
+
+function onStdInputChange(ratioKey, value) {
+  const key = getStdKey();
+  if (!stdOverrides[key]) stdOverrides[key] = {};
+  const parsed = parseFloat(value);
+  if (!isNaN(parsed)) {
+    stdOverrides[key][ratioKey] = parsed;
+  } else {
+    delete stdOverrides[key][ratioKey];
+  }
+  saveStdToStorage();
+}
+
+// 기준비율과 비교 (ratioKey, 회사값, 기준값)
+// 높을수록 좋은 비율: 유동비율, 이자보상배율, 매출액영업이익률, 매출액순이익률, 총자산순이익률, 자산회전율
+// 낮을수록 좋은 비율: 부채비율, 차입금의존도, 금융비용부담률, 유동부채비율
+function compareStd(ratioKey, companyVal, stdVal) {
+  if (companyVal === null || stdVal === null || stdVal === undefined) return '';
+  const higherIsBetter = ['유동비율','이자보상배율','매출액영업이익률','매출액순이익률','총자산순이익률','자산회전율','자기자본비율','순이익증가율','매출액증가율'];
+  const diff = companyVal - stdVal;
+  if (Math.abs(diff) < 0.05) return 'std-compare-neutral';
+  if (higherIsBetter.includes(ratioKey)) {
+    return diff > 0 ? 'std-compare-good' : 'std-compare-bad';
+  } else {
+    return diff < 0 ? 'std-compare-good' : 'std-compare-bad';
+  }
+}
+
 // ── 시작 ──
+loadStdFromStorage();
 init();
 </script>
 <footer style="text-align:center; padding:24px 0 16px; color:#a0aec0; font-size:12px;">made with 김태현 세무사, Claude AI</footer>
