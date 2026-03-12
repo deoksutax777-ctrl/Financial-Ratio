@@ -481,17 +481,17 @@ function getVal(fieldId, year) {
 
 function calcRatio(numerator, denominator) {
   if (numerator === null || denominator === null || denominator === 0) return null;
-  return Math.round((numerator / denominator) * 1000) / 10;
+  return Math.round((numerator / denominator) * 10000) / 100;
 }
 
 function calcGrowth(current, previous) {
   if (current === null || previous === null || previous === 0) return null;
-  return Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10;
+  return Math.round(((current - previous) / Math.abs(previous)) * 10000) / 100;
 }
 
 function calcTimes(numerator, denominator) {
   if (numerator === null || denominator === null || denominator === 0) return null;
-  return Math.round((numerator / denominator) * 10) / 10;
+  return Math.round((numerator / denominator) * 100) / 100;
 }
 
 function calculate() {
@@ -598,7 +598,7 @@ function calculate() {
       const lastYrVal = rightRows[displayYears.length - 1][rd.key];
       for (let j = 0; j < displayYears.length; j++) {
         const v = rightRows[j][rd.key];
-        const txt = v !== null ? v.toFixed(1) + rd.unit : '-';
+        const txt = v !== null ? v.toFixed(2) + rd.unit : '-';
         rHtml += `<td class="value-col">${txt}</td>`;
       }
       // 기준비율 컬럼
