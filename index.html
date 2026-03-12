@@ -217,6 +217,8 @@ header p { font-size: 13px; color: #718096; }
       <select id="stdType" onchange="onStdTypeChange()">
         <option value="general">종합건설업</option>
         <option value="special">전문건설업</option>
+        <option value="electric">전기공사업</option>
+        <option value="telecom">정보통신공사업</option>
       </select>
       <select id="stdSubType" style="display:none;" onchange="onStdSubTypeChange()">
         <option value="전체">전체 평균</option>
@@ -498,7 +500,8 @@ function calculate() {
 
   // 결과 테이블 헤더
   const stdRatios = getCurrentStdRatios();
-  const stdLabel = currentStdType === 'general' ? '종합건설' : (currentStdSub === '전체' ? '전문건설' : currentStdSub);
+  const stdLabelMap = { general: '종합건설', electric: '전기공사', telecom: '정보통신' };
+  const stdLabel = currentStdType === 'special' ? (currentStdSub === '전체' ? '전문건설' : currentStdSub) : (stdLabelMap[currentStdType] || '종합건설');
   const head = document.getElementById('resultHead');
   head.innerHTML = `
     <th class="left-header" style="border-radius:6px 0 0 0;">재무항목</th>
@@ -1480,7 +1483,8 @@ async function downloadExcel() {
   // Standard ratio column header
   const ORANGE_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC05621' } };
   const stdRatiosExcel = getCurrentStdRatios();
-  const stdLabelExcel = currentStdType === 'general' ? '종합건설' : (currentStdSub === '전체' ? '전문건설' : currentStdSub);
+  const stdLabelMapExcel = { general: '종합건설', electric: '전기공사', telecom: '정보통신' };
+  const stdLabelExcel = currentStdType === 'special' ? (currentStdSub === '전체' ? '전문건설' : currentStdSub) : (stdLabelMapExcel[currentStdType] || '종합건설');
   ws2.getColumn(11).width = 14;
   const stdHdrCell = ws2.getCell(4, 11);
   stdHdrCell.value = '기준비율\n(' + stdLabelExcel + ')';
@@ -1735,6 +1739,26 @@ const STD_RATIOS = {
     '철강구조물': { label: '철강구조물', 부채비율: 144.52, 유동비율: 123.91 },
     '수중·준설': { label: '수중·준설', 부채비율: 125.84, 유동비율: 154.60 },
     '승강기·삭도': { label: '승강기·삭도', 부채비율: 78.01, 유동비율: 110.92 },
+  },
+  electric: {
+    label: '전기공사업',
+    부채비율: 124.41,
+    유동비율: 142.58,
+    매출액순이익률: 3.62,
+    자산회전율: 0.79,
+    매출액영업이익률: 4.05,
+    이자보상배율: 3.25,
+    총자산순이익률: 2.86,
+  },
+  telecom: {
+    label: '정보통신공사업',
+    부채비율: 124.03,
+    유동비율: 140.06,
+    매출액순이익률: 3.62,
+    매출액영업이익률: 3.92,
+    자산회전율: 0.92,
+    차입금의존도: 15.10,
+    총자산순이익률: 3.23,
   }
 };
 
@@ -1766,15 +1790,16 @@ function saveStdToStorage() {
 }
 
 function getStdKey() {
-  return currentStdType === 'general' ? 'general' : 'special_' + currentStdSub;
+  if (currentStdType === 'special') return 'special_' + currentStdSub;
+  return currentStdType;
 }
 
 function getCurrentStdRatios() {
   let base = {};
-  if (currentStdType === 'general') {
-    base = { ...STD_RATIOS.general };
-  } else {
+  if (currentStdType === 'special') {
     base = { ...(STD_RATIOS.special[currentStdSub] || STD_RATIOS.special['전체']) };
+  } else {
+    base = { ...(STD_RATIOS[currentStdType] || STD_RATIOS.general) };
   }
   // 사용자 수정값 적용
   const overrides = stdOverrides[getStdKey()] || {};
