@@ -530,7 +530,7 @@ function buildReclassSection(tbody, years) {
   let sumHtml = `<td style="padding-left:16px;">대체 합계 (−)</td>`;
   for (const yr of years) {
     const total = getReclassTotal(yr);
-    sumHtml += `<td style="text-align:right; font-family:'Consolas','D2Coding',monospace; padding-right:8px;">${total ? '(' + formatNum(total) + ')' : '-'}</td>`;
+    sumHtml += `<td id="reclass_sum_${yr}" style="text-align:right; font-family:'Consolas','D2Coding',monospace; padding-right:8px;">${total ? '(' + formatNum(total) + ')' : '-'}</td>`;
   }
   sumTr.innerHTML = sumHtml;
   tbody.appendChild(sumTr);
@@ -541,7 +541,7 @@ function buildReclassSection(tbody, years) {
   let adjHtml = `<td>유동자산 (조정 후)</td>`;
   for (const yr of years) {
     const adj = getAdjustedCurrentAssets(yr);
-    adjHtml += `<td style="text-align:right; font-family:'Consolas','D2Coding',monospace; padding-right:8px;">${adj !== null ? formatNum(adj) : '-'}</td>`;
+    adjHtml += `<td id="reclass_adj_${yr}" style="text-align:right; font-family:'Consolas','D2Coding',monospace; padding-right:8px;">${adj !== null ? formatNum(adj) : '-'}</td>`;
   }
   adjTr.innerHTML = adjHtml;
   tbody.appendChild(adjTr);
@@ -568,9 +568,23 @@ function onReclassAmtChange(e) {
       reclassData[id][year] = val;
     }
   }
+  updateReclassSummary();
   saveToStorage();
-  buildInputGrid();
   calculate();
+}
+
+function updateReclassSummary() {
+  const years = getYears();
+  for (const yr of years) {
+    const total = getReclassTotal(yr);
+    const sumEl = document.getElementById(`reclass_sum_${yr}`);
+    if (sumEl) sumEl.textContent = total ? '(' + formatNum(total) + ')' : '-';
+    const adjEl = document.getElementById(`reclass_adj_${yr}`);
+    if (adjEl) {
+      const adj = getAdjustedCurrentAssets(yr);
+      adjEl.textContent = adj !== null ? formatNum(adj) : '-';
+    }
+  }
 }
 
 function onInputChange(e) {
